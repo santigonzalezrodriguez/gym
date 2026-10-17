@@ -2,7 +2,7 @@
 <html lang="es" class="h-full bg-slate-50">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FitTracker AI</title>
 
   <!-- PWA & Mobile Meta Tags -->
@@ -40,9 +40,19 @@
       padding: 1rem;
       z-index: 50;
     }
+    @keyframes toastIn {
+      from { opacity: translate(-50%, -10px); opacity: 0; }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+    .toast-animate {
+      animation: toastIn 0.25s ease-out forwards;
+    }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-full flex flex-col pb-16 select-none">
+<body class="bg-slate-50 text-slate-800 min-h-full flex flex-col pb-20 select-none">
+
+  <!-- Contenedor de Toasts Discretos -->
+  <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4"></div>
 
   <!-- Header Limpio y Compacto (Mobile First) -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -61,6 +71,10 @@
 
       <!-- Acciones de Cabecera -->
       <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="toggleRestTimerBar()" title="Temporizador de descanso" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition">
+          <i class="fa-solid fa-stopwatch text-xs"></i>
+        </button>
+
         <button onclick="openExtraActivityModal()" title="Registrar Actividad Deportiva Extra" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1.5 rounded-xl transition text-xs font-bold flex items-center gap-1">
           <i class="fa-solid fa-person-running text-amber-600"></i>
           <span>+ Extra</span>
@@ -80,6 +94,37 @@
       </div>
     </div>
   </header>
+
+  <!-- Temporizador de Descanso Fijo Inferior -->
+  <div id="restTimerBar" class="hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900 border-t border-slate-800 text-white p-3 shadow-2xl transition-colors duration-300">
+    <div class="max-w-xl mx-auto flex items-center justify-between gap-2.5">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-stopwatch"></i>
+        </div>
+        <div>
+          <div id="restTimerCountdown" class="text-xl font-black font-mono tracking-tight leading-none text-white">01:30</div>
+          <div id="restTimerStatusText" class="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">Descanso</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1">
+        <button onclick="setRestTimerPreset(60)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">60s</button>
+        <button onclick="setRestTimerPreset(90)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">90s</button>
+        <button onclick="setRestTimerPreset(120)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">120s</button>
+        <button onclick="setRestTimerPreset(180)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">180s</button>
+      </div>
+
+      <div class="flex items-center gap-1 shrink-0">
+        <button id="btnRestTimerToggle" onclick="toggleRestTimerRunning()" class="w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center text-xs transition shadow-sm" title="Iniciar/Pausar">
+          <i id="restTimerPlayIcon" class="fa-solid fa-play"></i>
+        </button>
+        <button onclick="closeRestTimerBar()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition" title="Cerrar temporizador">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Contenedor Principal -->
   <main class="max-w-xl mx-auto w-full px-3.5 pt-3.5 space-y-3.5 flex-1">
@@ -661,6 +706,13 @@
     let currentCalendarDate = new Date();
     let selectedCalendarDateStr = getLocalDateString(new Date());
 
+    // Estado del Temporizador de Descanso
+    let restTimerDuration = 90;
+    let restTimerEndTime = null;
+    let restTimerInterval = null;
+    let isRestTimerRunning = false;
+    let audioCtx = null;
+
     function getLocalDateString(d = new Date()) {
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -671,6 +723,269 @@
     function escapeHtml(str) {
       if (!str) return '';
       return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    // Sistema de Avisos Discretos (Toast)
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      let bgClass = "bg-slate-900 border-slate-700 text-white";
+      let icon = "fa-circle-info";
+
+      if (type === 'success') {
+        bgClass = "bg-emerald-600 border-emerald-500 text-white";
+        icon = "fa-circle-check";
+      } else if (type === 'error') {
+        bgClass = "bg-rose-600 border-rose-500 text-white";
+        icon = "fa-triangle-exclamation";
+      } else if (type === 'info') {
+        bgClass = "bg-indigo-600 border-indigo-500 text-white";
+        icon = "fa-circle-info";
+      }
+
+      toast.className = `toast-animate flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-semibold shadow-xl ${bgClass} transition-all duration-300 pointer-events-auto`;
+      toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i><span class="flex-1">${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translate(-50%, -10px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Funciones del Temporizador de Descanso
+    function toggleRestTimerBar() {
+      const bar = document.getElementById('restTimerBar');
+      if (!bar) return;
+      if (bar.classList.contains('hidden')) {
+        bar.classList.remove('hidden');
+        if (!isRestTimerRunning) {
+          updateRestTimerDisplay(restTimerDuration * 1000);
+        }
+      } else {
+        bar.classList.add('hidden');
+      }
+    }
+
+    function closeRestTimerBar() {
+      const bar = document.getElementById('restTimerBar');
+      if (bar) bar.classList.add('hidden');
+      stopRestTimer();
+    }
+
+    function setRestTimerPreset(seconds) {
+      restTimerDuration = seconds;
+      startRestTimer(seconds);
+    }
+
+    function toggleRestTimerRunning() {
+      if (isRestTimerRunning) {
+        stopRestTimer();
+      } else {
+        startRestTimer(restTimerDuration);
+      }
+    }
+
+    function startRestTimer(seconds = null) {
+      if (seconds !== null) {
+        restTimerDuration = seconds;
+      }
+      const bar = document.getElementById('restTimerBar');
+      if (bar) {
+        bar.classList.remove('hidden');
+        bar.classList.remove('bg-rose-700', 'border-rose-600');
+        bar.classList.add('bg-slate-900', 'border-slate-800');
+      }
+
+      const statusText = document.getElementById('restTimerStatusText');
+      if (statusText) statusText.textContent = "Descanso en curso";
+
+      const playIcon = document.getElementById('restTimerPlayIcon');
+      if (playIcon) playIcon.className = "fa-solid fa-pause";
+
+      restTimerEndTime = Date.now() + (restTimerDuration * 1000);
+      isRestTimerRunning = true;
+
+      if (restTimerInterval) clearInterval(restTimerInterval);
+      updateRestTimerCountdown();
+      restTimerInterval = setInterval(updateRestTimerCountdown, 250);
+    }
+
+    function stopRestTimer() {
+      isRestTimerRunning = false;
+      if (restTimerInterval) {
+        clearInterval(restTimerInterval);
+        restTimerInterval = null;
+      }
+      const playIcon = document.getElementById('restTimerPlayIcon');
+      if (playIcon) playIcon.className = "fa-solid fa-play";
+      const statusText = document.getElementById('restTimerStatusText');
+      if (statusText) statusText.textContent = "Pausado";
+    }
+
+    function updateRestTimerCountdown() {
+      if (!isRestTimerRunning || !restTimerEndTime) return;
+      const remainingMs = restTimerEndTime - Date.now();
+
+      if (remainingMs <= 0) {
+        // Fin del descanso
+        updateRestTimerDisplay(0);
+        stopRestTimer();
+        triggerRestTimerAlarm();
+        return;
+      }
+
+      updateRestTimerDisplay(remainingMs);
+    }
+
+    function updateRestTimerDisplay(ms) {
+      const totalSec = Math.max(0, Math.ceil(ms / 1000));
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      const text = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      const el = document.getElementById('restTimerCountdown');
+      if (el) el.textContent = text;
+    }
+
+    function triggerRestTimerAlarm() {
+      const bar = document.getElementById('restTimerBar');
+      if (bar) {
+        bar.classList.remove('bg-slate-900', 'border-slate-800');
+        bar.classList.add('bg-rose-700', 'border-rose-600');
+      }
+
+      const statusText = document.getElementById('restTimerStatusText');
+      if (statusText) statusText.textContent = "¡Tiempo finalizado!";
+
+      // Vibración si existe soporte
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([200, 100, 200, 100, 300]);
+      }
+
+      // Pitido con Web Audio API
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (audioCtx) {
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime); // La5
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.5);
+        }
+      } catch (e) {
+        console.warn("Audio Context error:", e);
+      }
+    }
+
+    // Función auxiliar para buscar ejercicios en todas las sesiones (Fase 2)
+    function findExerciseById(exerciseId) {
+      if (!exerciseId || !workoutSessions) return null;
+      for (const session of workoutSessions) {
+        if (session.exercises && Array.isArray(session.exercises)) {
+          const ex = session.exercises.find(e => e.id === exerciseId);
+          if (ex) return { session, ex };
+        }
+      }
+      return null;
+    }
+
+    // Función para sincronizar series pendientes a la carga y reps del plan activo
+    function syncUnfinishedSetsToPlan(ex) {
+      if (!ex || !ex.setsLog || !Array.isArray(ex.setsLog)) return;
+      const targetWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) 
+        ? ex.weights[activeGymLocation] 
+        : (ex.weight || 0);
+      const targetReps = ex.reps;
+      ex.setsLog.forEach(s => {
+        if (s.done === false) {
+          s.weight = targetWeight;
+          s.reps = targetReps;
+        }
+      });
+    }
+
+    // Función para obtener la última marca de rendimiento (Fase 3 y 4)
+    function getLastPerformance(ex) {
+      if (!workoutLogs || workoutLogs.length === 0 || !ex) return null;
+
+      for (const log of workoutLogs) {
+        if (log.isExtraActivity || !log.exercisesDetail) continue;
+
+        const match = log.exercisesDetail.find(d => {
+          if (d.status !== 'completed') return false;
+          if (ex.id && d.id) return d.id === ex.id;
+          return d.name && d.name.toLowerCase() === ex.name.toLowerCase();
+        });
+
+        if (match) {
+          let dateStr = '';
+          if (log.localDate) {
+            const parts = log.localDate.split('-');
+            if (parts.length === 3) {
+              const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+              dateStr = dObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+            }
+          }
+          if (!dateStr && log.createdAt) {
+            dateStr = new Date(log.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+          }
+
+          let seriesText = '';
+          if (match.setsDetail && Array.isArray(match.setsDetail) && match.setsDetail.length > 0) {
+            const doneSets = match.setsDetail.filter(s => s.done);
+            const targetSets = doneSets.length > 0 ? doneSets : match.setsDetail;
+            seriesText = targetSets.map(s => `${s.weight}×${s.reps}`).join(', ');
+          }
+
+          return {
+            weight: match.weight ?? 0,
+            rpe: match.rpe || null,
+            date: dateStr,
+            seriesText: seriesText || null
+          };
+        }
+      }
+      return null;
+    }
+
+    // Inicializador / sincronizador de series detalladas (Fase 4)
+    function ensureExerciseSetsLog(ex) {
+      const plannedSets = parseInt(ex.sets) || 1;
+      const defaultWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) 
+        ? ex.weights[activeGymLocation] 
+        : (ex.weight || 0);
+      const defaultReps = parseInt(ex.reps) || 10;
+
+      if (!ex.setsLog || !Array.isArray(ex.setsLog)) {
+        ex.setsLog = [];
+      }
+
+      while (ex.setsLog.length < plannedSets) {
+        ex.setsLog.push({
+          weight: defaultWeight,
+          reps: defaultReps,
+          done: false
+        });
+      }
+
+      if (ex.setsLog.length > plannedSets) {
+        ex.setsLog = ex.setsLog.slice(0, plannedSets);
+      }
     }
 
     function setGymLocation(loc) {
@@ -691,6 +1006,14 @@
 
       const badge = document.getElementById('activeGymBadge');
       if (badge) badge.textContent = `Sede: ${loc}`;
+
+      workoutSessions.forEach(session => {
+        if (session.exercises && Array.isArray(session.exercises)) {
+          session.exercises.forEach(ex => {
+            syncUnfinishedSetsToPlan(ex);
+          });
+        }
+      });
 
       renderAll();
     }
@@ -754,12 +1077,32 @@
       if (!session.exercises) session.exercises = [];
 
       session.exercises.forEach(ex => {
+        ensureExerciseSetsLog(ex);
+
         if (ex.status === 'completed') {
-          const weight = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
-          if (ex.type !== 'time') {
-            totalVolume += (ex.sets * ex.reps * weight);
-          }
           completedCount++;
+        }
+
+        // Cálculo de volumen real considerando setsLog (Fase 4)
+        if (ex.type !== 'time') {
+          if (ex.setsLog && Array.isArray(ex.setsLog)) {
+            const doneSets = ex.setsLog.filter(s => s.done);
+            if (doneSets.length > 0) {
+              doneSets.forEach(s => {
+                totalVolume += (Number(s.weight) || 0) * (Number(s.reps) || 0);
+              });
+            } else if (ex.status === 'completed') {
+              const currentWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) 
+                ? ex.weights[activeGymLocation] 
+                : (ex.weight || 0);
+              totalVolume += (ex.sets * ex.reps * currentWeight);
+            }
+          } else if (ex.status === 'completed') {
+            const currentWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) 
+              ? ex.weights[activeGymLocation] 
+              : (ex.weight || 0);
+            totalVolume += (ex.sets * ex.reps * currentWeight);
+          }
         }
       });
 
@@ -794,6 +1137,22 @@
         const isSkipped = ex.status === 'skipped';
         const isFeedbackOpen = openFeedbackIndex === idx;
         const currentWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
+        
+        // Fase 3.1: Última vez
+        const lastPerf = getLastPerformance(ex);
+        let lastPerfHtml = '';
+        if (lastPerf) {
+          let perfDesc = '';
+          if (lastPerf.seriesText) {
+            perfDesc = lastPerf.seriesText;
+          } else {
+            perfDesc = `${lastPerf.weight} kg`;
+          }
+          if (lastPerf.rpe) perfDesc += ` · RPE ${lastPerf.rpe}`;
+          if (lastPerf.date) perfDesc += ` · ${lastPerf.date}`;
+
+          lastPerfHtml = `<div class="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px] text-slate-400"></i><span>Última vez: ${escapeHtml(perfDesc)}</span></div>`;
+        }
 
         const item = document.createElement('div');
         item.className = `bg-white border rounded-xl transition shadow-sm overflow-hidden ${
@@ -833,11 +1192,12 @@
                   ${ex.tempo ? `<span class="bg-violet-50 text-violet-700 border border-violet-100 px-1 py-0.2 rounded text-[9px] font-mono font-medium" title="Tempo: Excéntrico - Pausa - Concéntrico"><i class="fa-solid fa-stopwatch text-[8px] mr-0.5"></i>${escapeHtml(ex.tempo)}</span>` : ''}
                   ${ex.rpe ? `<span class="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-medium border border-slate-200">RPE ${ex.rpe}</span>` : ''}
                 </div>
+                ${lastPerfHtml}
               </div>
             </div>
 
             <div class="flex items-center gap-1 shrink-0">
-              <button onclick="toggleExerciseFeedbackPanel(${idx})" title="Registrar Feedback" class="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center">
+              <button onclick="toggleExerciseFeedbackPanel(${idx})" title="Registrar Feedback y Series" class="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center">
                 <i class="fa-solid fa-sliders"></i>
               </button>
               <button onclick="openEditExerciseModal(${idx})" title="Editar" class="text-slate-400 hover:text-slate-700 w-7 h-7 rounded-lg transition flex items-center justify-center">
@@ -854,6 +1214,40 @@
               <div class="font-bold text-slate-700 flex justify-between items-center text-[11px]">
                 <span><i class="fa-solid fa-clipboard-check text-indigo-600 mr-1"></i> Feedback: ${escapeHtml(ex.name)}</span>
                 <button onclick="toggleExerciseFeedbackPanel(${idx})" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+
+              <!-- Registro por Serie (Fase 4) -->
+              <div class="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
+                <div class="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <span>Registro Serie por Serie</span>
+                  <span>${ex.type === 'time' ? 'Segundos' : 'Carga × Reps'}</span>
+                </div>
+                <div class="space-y-1.5">
+                  ${(ex.setsLog || []).map((s, sIdx) => `
+                    <div class="flex items-center gap-2 bg-slate-50/80 p-1.5 rounded-lg border border-slate-200/80">
+                      <span class="text-[10px] font-bold text-slate-500 w-12 shrink-0">S${sIdx + 1}</span>
+                      <div class="flex-1 flex items-center gap-1.5">
+                        <div class="relative flex-1">
+                          <input type="number" step="0.5" id="setWeight_${idx}_${sIdx}" value="${s.weight ?? currentWeight}" 
+                            class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 text-center"
+                            placeholder="${ex.type === 'time' ? 'Seg' : 'Kg'}">
+                          <span class="absolute right-1.5 top-1.5 text-[9px] text-slate-400 pointer-events-none">${ex.type === 'time' ? 's' : 'kg'}</span>
+                        </div>
+                        <span class="text-slate-400 text-xs">×</span>
+                        <div class="relative flex-1">
+                          <input type="number" id="setReps_${idx}_${sIdx}" value="${s.reps ?? ex.reps}" 
+                            class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 text-center"
+                            placeholder="Reps">
+                          <span class="absolute right-1.5 top-1.5 text-[9px] text-slate-400 pointer-events-none">${ex.type === 'time' ? 's' : 'reps'}</span>
+                        </div>
+                      </div>
+                      <label class="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-300 cursor-pointer shrink-0">
+                        <input type="checkbox" id="setDone_${idx}_${sIdx}" ${s.done ? 'checked' : ''} class="w-3.5 h-3.5 text-emerald-600 rounded">
+                        <span class="text-[10px] font-semibold text-slate-600">Hecha</span>
+                      </label>
+                    </div>
+                  `).join('')}
+                </div>
               </div>
               
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -914,9 +1308,22 @@
       const session = getActiveSession();
       if (!session || !session.exercises[index]) return;
       const current = session.exercises[index].status;
-      if (current === 'pending') session.exercises[index].status = 'completed';
-      else if (current === 'completed') session.exercises[index].status = 'skipped';
-      else session.exercises[index].status = 'pending';
+      if (current === 'pending') {
+        session.exercises[index].status = 'completed';
+        if (session.exercises[index].setsLog) {
+          session.exercises[index].setsLog.forEach(s => s.done = true);
+        }
+      } else if (current === 'completed') {
+        session.exercises[index].status = 'skipped';
+        if (session.exercises[index].setsLog) {
+          session.exercises[index].setsLog.forEach(s => s.done = false);
+        }
+      } else {
+        session.exercises[index].status = 'pending';
+        if (session.exercises[index].setsLog) {
+          session.exercises[index].setsLog.forEach(s => s.done = false);
+        }
+      }
       saveMainState();
     }
 
@@ -928,14 +1335,33 @@
     function saveIndividualFeedback(idx) {
       const session = getActiveSession();
       if (!session || !session.exercises[idx]) return;
+      const ex = session.exercises[idx];
 
-      session.exercises[idx].status = document.getElementById(`exStatus_${idx}`).value;
-      session.exercises[idx].sensation = document.getElementById(`exSensation_${idx}`).value;
-      session.exercises[idx].rpe = document.getElementById(`exRPE_${idx}`).value;
-      session.exercises[idx].notes = document.getElementById(`exNotes_${idx}`).value.trim();
+      ex.status = document.getElementById(`exStatus_${idx}`).value;
+      ex.sensation = document.getElementById(`exSensation_${idx}`).value;
+      ex.rpe = document.getElementById(`exRPE_${idx}`).value;
+      ex.notes = document.getElementById(`exNotes_${idx}`).value.trim();
+
+      // Guardar series detalladas (Fase 4)
+      if (ex.setsLog && Array.isArray(ex.setsLog)) {
+        ex.setsLog.forEach((s, sIdx) => {
+          const wInput = document.getElementById(`setWeight_${idx}_${sIdx}`);
+          const rInput = document.getElementById(`setReps_${idx}_${sIdx}`);
+          const doneInput = document.getElementById(`setDone_${idx}_${sIdx}`);
+          if (wInput) s.weight = parseFloat(wInput.value) || 0;
+          if (rInput) s.reps = parseInt(rInput.value) || 0;
+          if (doneInput) s.done = doneInput.checked;
+        });
+
+        // Si alguna serie está completada pero el ejercicio estaba pendiente, marcar como completed
+        if (ex.setsLog.some(s => s.done) && ex.status === 'pending') {
+          ex.status = 'completed';
+        }
+      }
 
       openFeedbackIndex = null;
       saveMainState();
+      showToast("Feedback actualizado", "success");
     }
 
     function handleCatalogSearch(queryStr) {
@@ -1069,7 +1495,7 @@
 
         if (!editId) {
           const newExId = "ex_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
-          session.exercises.push({
+          const newEx = {
             id: newExId,
             name, group, type, sets, reps,
             weights: { CEN: weightCen, POL: weightPol },
@@ -1078,7 +1504,9 @@
             sensation: 'Adecuada',
             rpe: '8',
             notes: ''
-          });
+          };
+          ensureExerciseSetsLog(newEx);
+          session.exercises.push(newEx);
         } else {
           const target = session.exercises.find(ex => ex.id === editId);
           if (target) {
@@ -1090,6 +1518,8 @@
             target.weights = { CEN: weightCen, POL: weightPol };
             target.tempo = tempo;
             target.isLocked = isLocked;
+            ensureExerciseSetsLog(target);
+            syncUnfinishedSetsToPlan(target);
           }
         }
 
@@ -1120,7 +1550,7 @@
 
     async function completeCurrentWorkoutSession() {
       if (!currentUser || !db) {
-        alert("Inicia sesión para guardar entrenamientos.");
+        showToast("Inicia sesión para guardar entrenamientos.", "info");
         toggleLoginModal();
         return;
       }
@@ -1130,7 +1560,7 @@
 
       const completedCount = session.exercises.filter(e => e.status === 'completed').length;
       if (completedCount === 0) {
-        alert("Marca al menos un ejercicio como realizado antes de guardar.");
+        showToast("Marca al menos un ejercicio como realizado antes de guardar.", "error");
         return;
       }
 
@@ -1140,12 +1570,25 @@
 
       let volume = 0;
       session.exercises.forEach(ex => {
-        if (ex.status === 'completed' && ex.type !== 'time') {
-          const w = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
-          volume += (ex.sets * ex.reps * w);
+        if (ex.type !== 'time') {
+          if (ex.setsLog && Array.isArray(ex.setsLog)) {
+            const doneSets = ex.setsLog.filter(s => s.done);
+            if (doneSets.length > 0) {
+              doneSets.forEach(s => {
+                volume += (Number(s.weight) || 0) * (Number(s.reps) || 0);
+              });
+            } else if (ex.status === 'completed') {
+              const w = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
+              volume += (ex.sets * ex.reps * w);
+            }
+          } else if (ex.status === 'completed') {
+            const w = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
+            volume += (ex.sets * ex.reps * w);
+          }
         }
       });
 
+      // Fase 1.1 y 4: Guardar detalle con id, group, type, sensation, notes y setsDetail
       const logData = {
         sessionName: session.name,
         localDate: localDate,
@@ -1155,23 +1598,44 @@
         completedCount: completedCount,
         volume: volume,
         exercisesDetail: session.exercises.map(e => ({
+          id: e.id || null,
           name: e.name,
+          group: e.group || null,
+          type: e.type || 'reps',
           sets: e.sets,
           reps: e.reps,
           weight: (e.weights && e.weights[activeGymLocation] !== undefined) ? e.weights[activeGymLocation] : (e.weight || 0),
-          rpe: e.rpe,
-          status: e.status
+          rpe: e.rpe || '8',
+          sensation: e.sensation || 'Adecuada',
+          notes: e.notes || '',
+          status: e.status,
+          setsDetail: (e.setsLog && Array.isArray(e.setsLog)) ? e.setsLog.map(s => ({
+            weight: Number(s.weight) || 0,
+            reps: Number(s.reps) || 0,
+            done: !!s.done
+          })) : null
         }))
       };
 
       try {
         const logsCollRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs');
         await addDoc(logsCollRef, logData);
-        session.exercises.forEach(ex => { ex.status = 'pending'; });
+
+        // Fase 1.2: Reiniciar sensation, rpe y notes tras guardar
+        session.exercises.forEach(ex => {
+          ex.status = 'pending';
+          ex.sensation = 'Adecuada';
+          ex.rpe = '8';
+          ex.notes = '';
+          if (ex.setsLog && Array.isArray(ex.setsLog)) {
+            ex.setsLog.forEach(s => s.done = false);
+          }
+        });
+
         saveMainState();
-        alert("¡Entrenamiento guardado con éxito!");
+        showToast("¡Entrenamiento guardado con éxito!", "success");
       } catch (err) {
-        alert("Error al guardar: " + err.message);
+        showToast("Error al guardar: " + err.message, "error");
       }
     }
 
@@ -1185,7 +1649,7 @@
 
     async function saveExtraActivity() {
       if (!currentUser || !db) {
-        alert("Inicia sesión para registrar actividades.");
+        showToast("Inicia sesión para registrar actividades.", "info");
         toggleLoginModal();
         return;
       }
@@ -1209,15 +1673,15 @@
         const logsCollRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs');
         await addDoc(logsCollRef, activityData);
         closeExtraActivityModal();
-        alert(`¡${name} registrada! La IA adaptará la fatiga de tu planificación.`);
+        showToast(`¡${name} registrada! La IA adaptará la fatiga.`, "success");
       } catch (err) {
-        alert("Error: " + err.message);
+        showToast("Error: " + err.message, "error");
       }
     }
 
     function openPlanWeekModal() {
       if (!currentUser || !geminiApiKey) {
-        alert("Inicia sesión para usar el planificador IA.");
+        showToast("Inicia sesión para usar el planificador IA.", "info");
         toggleLoginModal();
         return;
       }
@@ -1253,8 +1717,10 @@
       const recentGymLogs = workoutLogs.filter(l => !l.isExtraActivity).slice(0, 8);
       const availableCatalogForGym = allowedCatalog.filter(c => activeGymLocation === 'CEN' ? c.inCen : c.inPol);
 
+      // Fase 1.1, 1.3 y Fase 2.5: Prompt actualizado
       const prompt = `Actúa como un entrenador de fuerza de élite especializado en periodización por bloques.
 Sede: "${activeGymLocation}". Días disponibles para entrenar: ${targetWeekDays}.
+Sesiones existentes: ${workoutSessions.length}. Días elegidos por el usuario: ${targetWeekDays}. Si el número de sesiones existentes y los días elegidos no coinciden, indícalo en phaseExplanation y recomienda cómo repartir los ejercicios, pero NO inventes sesiones nuevas; solo puedes ajustar los ejercicios existentes.
 Rutina actual: ${JSON.stringify(workoutSessions)}
 Historial gym: ${JSON.stringify(recentGymLogs)}
 Actividades extra recientes: ${JSON.stringify(recentExtras)}
@@ -1262,9 +1728,10 @@ Catálogo permitido (PROHIBIDO SUGERIR OTROS): ${JSON.stringify(availableCatalog
 
 Instrucciones:
 1. Evalúa si toca acumulación, sobrecarga o descarga.
-2. Si isLocked=true, NUNCA cambies el ejercicio (solo peso/reps).
-3. Si isLocked=false, puedes rotar por otro del mismo grupo muscular del catálogo si procede.
-4. Devuelve ÚNICAMENTE un JSON válido:
+2. Usa los campos sensation y notes del historial: si un ejercicio terminó en 'Muy Pesada' o 'Fallo', no subas carga; si fue 'Ligera' de forma repetida, súbela.
+3. Si isLocked=true, NUNCA cambies el ejercicio (solo peso/reps).
+4. Si isLocked=false, puedes proponer sustitución por otro ejercicio del catálogo si procede. Una sustitución solo es válida si el ejercicio está en el catálogo permitido, está disponible en la sede indicada y es del mismo grupo muscular y del mismo tipo (reps/time) que el original.
+5. Devuelve ÚNICAMENTE un JSON válido:
 {
   "phaseExplanation": "Resumen táctico de la fase y por qué",
   "adjustments": [
@@ -1294,13 +1761,14 @@ Instrucciones:
         renderAiProposal(parsed);
       } catch (err) {
         console.error("Error Head Coach Gemini:", err);
-        alert("No se pudo completar el análisis: " + err.message);
+        showToast("No se pudo completar el análisis: " + err.message, "error");
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Planificar Semana & Periodización (Head Coach IA)`;
       }
     }
 
+    // Fase 1.3 y Fase 2: renderAiProposal buscando en todas las sesiones y validando sustituciones
     function renderAiProposal(proposal) {
       pendingAiProposal = proposal;
       const box = document.getElementById('aiSuggestionBox');
@@ -1312,21 +1780,35 @@ Instrucciones:
       textEl.textContent = proposal.phaseExplanation || "Propuesta de periodización calculada.";
       container.innerHTML = '';
 
-      const session = getActiveSession();
-      if (!session) return;
+      let ignoredCount = 0;
 
       (proposal.adjustments || []).forEach((adj, idx) => {
-        const ex = session.exercises.find(e => e.id === adj.exerciseId);
-        if (!ex) return;
+        const found = findExerciseById(adj.exerciseId);
+        if (!found) {
+          ignoredCount++;
+          return;
+        }
 
+        const { session, ex } = found;
         const currentW = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
         const item = document.createElement('div');
         item.className = "bg-white/80 p-2 rounded-xl border border-amber-200 flex items-center justify-between text-xs";
         
-        let desc = `<span class="font-bold text-slate-800">${escapeHtml(ex.name)}</span>`;
+        let desc = `<span class="font-bold text-slate-800">${escapeHtml(ex.name)} <span class="text-[10px] text-slate-400 font-normal">(${escapeHtml(session.name)})</span></span>`;
+        
+        // Validación de sustitución (Fase 1.3)
         if (adj.replaceWithName && adj.replaceWithName !== ex.name) {
-          desc += ` ➔ <span class="text-indigo-600 font-bold">${escapeHtml(adj.replaceWithName)}</span>`;
+          const catItem = allowedCatalog.find(c => c.name.toLowerCase() === adj.replaceWithName.toLowerCase());
+          const isGymAvailable = catItem && (activeGymLocation === 'CEN' ? catItem.inCen === true : catItem.inPol === true);
+          const isSameGroupAndType = catItem && catItem.group === ex.group && (catItem.type || 'reps') === (ex.type || 'reps');
+
+          if (catItem && isGymAvailable && isSameGroupAndType) {
+            desc += ` ➔ <span class="text-indigo-600 font-bold">${escapeHtml(adj.replaceWithName)}</span>`;
+          } else {
+            desc += ` <span class="text-[10px] text-slate-400 italic">(sustitución no válida, se ignorará)</span>`;
+          }
         }
+
         if (adj.suggestedWeight !== undefined && adj.suggestedWeight !== currentW) {
           desc += ` <span class="text-amber-700 font-semibold">(${currentW}kg ➔ ${adj.suggestedWeight}kg)</span>`;
         }
@@ -1343,6 +1825,13 @@ Instrucciones:
         container.appendChild(item);
       });
 
+      if (ignoredCount > 0) {
+        const ignoredNote = document.createElement('div');
+        ignoredNote.className = "text-[11px] text-slate-400 italic text-center pt-1";
+        ignoredNote.textContent = `${ignoredCount} ajustes ignorados (ejercicio no encontrado)`;
+        container.appendChild(ignoredNote);
+      }
+
       box.classList.remove('hidden');
       window.scrollTo({ top: 100, behavior: 'smooth' });
     }
@@ -1352,16 +1841,17 @@ Instrucciones:
       document.getElementById('aiSuggestionBox').classList.add('hidden');
     }
 
+    // Fase 1.2, 1.3 y Fase 2: Aplicar propuesta en todas las sesiones con validación estricta
     function applySelectedAiSuggestions() {
       if (!pendingAiProposal || !pendingAiProposal.adjustments) return;
-      const session = getActiveSession();
-      if (!session) return;
 
       pendingAiProposal.adjustments.forEach((adj, idx) => {
         const chk = document.getElementById(`aiChange_${idx}`);
         if (chk && chk.checked) {
-          const ex = session.exercises.find(e => e.id === adj.exerciseId);
-          if (ex) {
+          const found = findExerciseById(adj.exerciseId);
+          if (found) {
+            const { ex } = found;
+
             if (typeof adj.suggestedWeight === 'number' && adj.suggestedWeight >= 0) {
               const currentW = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
               if (Math.abs(adj.suggestedWeight - currentW) <= 15) {
@@ -1372,29 +1862,44 @@ Instrucciones:
             if (adj.suggestedReps) ex.reps = adj.suggestedReps;
             if (adj.suggestedSets) ex.sets = adj.suggestedSets;
 
+            // Validación estricta de sustitución (Fase 1.3)
             if (adj.replaceWithName && !ex.isLocked) {
               const catItem = allowedCatalog.find(c => c.name.toLowerCase() === adj.replaceWithName.toLowerCase());
-              if (catItem) {
+              const isGymAvailable = catItem && (activeGymLocation === 'CEN' ? catItem.inCen === true : catItem.inPol === true);
+              const isSameGroupAndType = catItem && catItem.group === ex.group && (catItem.type || 'reps') === (ex.type || 'reps');
+
+              if (catItem && isGymAvailable && isSameGroupAndType) {
                 ex.name = catItem.name;
                 ex.group = catItem.group;
+                ex.type = catItem.type || 'reps';
                 if (!ex.weights) ex.weights = {};
                 ex.weights[activeGymLocation] = catItem.weights?.[activeGymLocation] || adj.suggestedWeight || ex.weights[activeGymLocation];
                 if (catItem.tempo) ex.tempo = catItem.tempo;
               }
             }
+
+            // Fase 1.2: Reiniciar status, sensation, rpe y notes
             ex.status = 'pending';
+            ex.sensation = 'Adecuada';
+            ex.rpe = '8';
+            ex.notes = '';
+            if (ex.setsLog && Array.isArray(ex.setsLog)) {
+              ensureExerciseSetsLog(ex);
+              syncUnfinishedSetsToPlan(ex);
+              ex.setsLog.forEach(s => s.done = false);
+            }
           }
         }
       });
 
       dismissAiSuggestion();
       saveMainState();
-      alert("Planificación aplicada con éxito a tus rutinas.");
+      showToast("Planificación aplicada con éxito a tus rutinas.", "success");
     }
 
     async function sendCoachQuery() {
       if (!currentUser || !geminiApiKey) {
-        alert("Inicia sesión para hablar con el Coach IA.");
+        showToast("Inicia sesión para hablar con el Coach IA.", "info");
         toggleLoginModal();
         return;
       }
@@ -1649,7 +2154,7 @@ Instrucciones:
 
     function toggleCoachModal() {
       if (!currentUser) {
-        alert("Inicia sesión para hablar con el Coach IA.");
+        showToast("Inicia sesión para hablar con el Coach IA.", "info");
         toggleLoginModal();
         return;
       }
@@ -1715,7 +2220,7 @@ Instrucciones:
         await signOut(auth);
         toggleLoginModal();
       } catch (err) {
-        alert("Error: " + err.message);
+        showToast("Error: " + err.message, "error");
       }
     }
 
@@ -1759,6 +2264,13 @@ Instrucciones:
     window.completeCurrentWorkoutSession = completeCurrentWorkoutSession;
     window.dismissAiSuggestion = dismissAiSuggestion;
     window.applySelectedAiSuggestions = applySelectedAiSuggestions;
+
+    // Funciones del temporizador y toasts en window
+    window.toggleRestTimerBar = toggleRestTimerBar;
+    window.closeRestTimerBar = closeRestTimerBar;
+    window.setRestTimerPreset = setRestTimerPreset;
+    window.toggleRestTimerRunning = toggleRestTimerRunning;
+    window.showToast = showToast;
 
     // Inicialización Firebase
     try {
@@ -1873,6 +2385,7 @@ Instrucciones:
           workoutLogs.push({ id: d.id, ...d.data() });
         });
         renderCalendar();
+        renderActiveSession(); // Fase 3.1: Actualizar líneas de última vez
       });
     }
 
