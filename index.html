@@ -215,6 +215,15 @@
           <input type="text" id="modalExName" placeholder="Ej. Press Banca, Sentadilla..." required
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
         </div>
+        
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Tipo de Medida</label>
+          <select id="modalExType" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium" onchange="updateUnitsLabel()">
+            <option value="reps">Por Repeticiones (ej. 8 reps)</option>
+            <option value="time">Por Tiempo / Isométrico (ej. 60 s)</option>
+          </select>
+        </div>
+
         <div class="grid grid-cols-3 gap-2">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Series</label>
@@ -222,7 +231,7 @@
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Reps Meta</label>
+            <label id="modalUnitsLabel" class="block text-xs font-semibold text-slate-700 mb-1">Reps</label>
             <input type="number" id="modalExReps" placeholder="10" min="1" required
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
           </div>
@@ -396,7 +405,15 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Función auxiliar para obtener fecha en formato YYYY-MM-DD en hora local
+    function getLocalDateString(dateObj = new Date()) {
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
 
     // Configuración de Firebase del proyecto gym-tracker-b1669
     const firebaseConfig = {
@@ -418,19 +435,24 @@
     let auth = null;
     let db = null;
     let currentUser = null;
-    let unsubscribeSnapshot = null;
+    let unsubscribeMainState = null;
+    let unsubscribeWorkoutLogs = null;
 
-    let workoutSessions = JSON.parse(localStorage.getItem('fit_sessions')) || [
+    function generateId(prefix = "item") {
+      return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    const defaultSessions = [
       {
         id: "sess_empuje",
         name: "Día 1: Empuje (Push)",
         lastCompleted: null,
         exercises: [
-          { name: "Press de Banca Plano", sets: 4, reps: 8, weight: 60, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Press Inclinado con Mancuernas", sets: 3, reps: 10, weight: 22, tempo: "2-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Press Militar con Barra", sets: 3, reps: 8, weight: 40, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Elevaciones Laterales", sets: 4, reps: 12, weight: 10, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "9", notes: "" },
-          { name: "Fondos en Paralelas", sets: 3, reps: 10, weight: 0, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" }
+          { id: "ex_p_banca", name: "Press de Banca Plano", type: "reps", sets: 4, reps: 8, weight: 60, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_p_inc", name: "Press Inclinado con Mancuernas", type: "reps", sets: 3, reps: 10, weight: 22, tempo: "2-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_p_mil", name: "Press Militar con Barra", type: "reps", sets: 3, reps: 8, weight: 40, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_elev_lat", name: "Elevaciones Laterales", type: "reps", sets: 4, reps: 12, weight: 10, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "9", notes: "" },
+          { id: "ex_fondos", name: "Fondos en Paralelas", type: "reps", sets: 3, reps: 10, weight: 0, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" }
         ]
       },
       {
@@ -438,11 +460,11 @@
         name: "Día 2: Tracción (Pull)",
         lastCompleted: null,
         exercises: [
-          { name: "Dominadas Pronas", sets: 4, reps: 8, weight: 0, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Remo con Barra", sets: 3, reps: 10, weight: 50, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Remo Gironda", sets: 3, reps: 12, weight: 45, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Face Pulls con Polea", sets: 4, reps: 15, weight: 20, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Curl de Bíceps con Barra Z", sets: 3, reps: 10, weight: 25, tempo: "3-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" }
+          { id: "ex_dominadas", name: "Dominadas Pronas", type: "reps", sets: 4, reps: 8, weight: 0, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_remo_b", name: "Remo con Barra", type: "reps", sets: 3, reps: 10, weight: 50, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_remo_g", name: "Remo Gironda", type: "reps", sets: 3, reps: 12, weight: 45, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_face_pull", name: "Face Pulls con Polea", type: "reps", sets: 4, reps: 15, weight: 20, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_curl_b", name: "Curl de Bíceps con Barra Z", type: "reps", sets: 3, reps: 10, weight: 25, tempo: "3-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" }
         ]
       },
       {
@@ -450,14 +472,28 @@
         name: "Día 3: Pierna & Core (Legs)",
         lastCompleted: null,
         exercises: [
-          { name: "Sentadilla Trasera con Barra", sets: 4, reps: 8, weight: 70, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Peso Muerto Rumano (RDL)", sets: 4, reps: 10, weight: 65, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Prensa de Piernas 45°", sets: 3, reps: 12, weight: 120, tempo: "2-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
-          { name: "Elevación de Gemelos", sets: 4, reps: 15, weight: 40, tempo: "2-2-1-0", status: "pending", sensation: "Adecuada", rpe: "9", notes: "" },
-          { name: "Plancha Abdominal", sets: 3, reps: 60, weight: 0, tempo: "", status: "pending", sensation: "Adecuada", rpe: "8", notes: "60 segundos" }
+          { id: "ex_sentadilla", name: "Sentadilla Trasera con Barra", type: "reps", sets: 4, reps: 8, weight: 70, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_rdl", name: "Peso Muerto Rumano (RDL)", type: "reps", sets: 4, reps: 10, weight: 65, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_prensa", name: "Prensa de Piernas 45°", type: "reps", sets: 3, reps: 12, weight: 120, tempo: "2-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { id: "ex_gemelos", name: "Elevación de Gemelos", type: "reps", sets: 4, reps: 15, weight: 40, tempo: "2-2-1-0", status: "pending", sensation: "Adecuada", rpe: "9", notes: "" },
+          { id: "ex_plancha", name: "Plancha Abdominal", type: "time", sets: 3, reps: 60, weight: 0, tempo: "", status: "pending", sensation: "Adecuada", rpe: "8", notes: "60 segundos" }
         ]
       }
     ];
+
+    let workoutSessions = JSON.parse(localStorage.getItem('fit_sessions')) || defaultSessions;
+    
+    // Asegurar que cada ejercicio tenga un ID único y un type
+    workoutSessions.forEach(sess => {
+      if (Array.isArray(sess.exercises)) {
+        sess.exercises.forEach(ex => {
+          if (!ex.id) ex.id = generateId('ex');
+          if (!ex.type) {
+            ex.type = (ex.name && ex.name.toLowerCase().includes('plancha')) ? 'time' : 'reps';
+          }
+        });
+      }
+    });
 
     let workoutLogs = JSON.parse(localStorage.getItem('fit_logs')) || [];
     let activeSessionIndex = 0;
@@ -466,7 +502,7 @@
     let exerciseToDeleteIndex = null;
 
     let currentCalendarDate = new Date();
-    let selectedCalendarDateStr = new Date().toISOString().slice(0, 10);
+    let selectedCalendarDateStr = getLocalDateString(new Date());
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -483,12 +519,16 @@
         updateAuthUI(user);
         if (user) {
           await loadGeminiApiKey();
-          attachFirestoreListener(user.uid);
+          attachFirestoreListeners(user.uid);
         } else {
           geminiApiKey = null;
-          if (unsubscribeSnapshot) {
-            unsubscribeSnapshot();
-            unsubscribeSnapshot = null;
+          if (unsubscribeMainState) {
+            unsubscribeMainState();
+            unsubscribeMainState = null;
+          }
+          if (unsubscribeWorkoutLogs) {
+            unsubscribeWorkoutLogs();
+            unsubscribeWorkoutLogs = null;
           }
           renderAll();
         }
@@ -544,42 +584,86 @@
       }
     }
 
-    function attachFirestoreListener(userId) {
+    // Listeners de Firestore: Sesiones (documento) y Logs (subcolección individual)
+    function attachFirestoreListeners(userId) {
       if (!db || !userId) return;
-      if (unsubscribeSnapshot) unsubscribeSnapshot();
+      if (unsubscribeMainState) unsubscribeMainState();
+      if (unsubscribeWorkoutLogs) unsubscribeWorkoutLogs();
 
-      const docRef = doc(db, 'artifacts', appId, 'users', userId, 'userWorkouts', 'mainState');
-      unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+      // 1. Sesiones de usuario
+      const mainStateDoc = doc(db, 'artifacts', appId, 'users', userId, 'userWorkouts', 'mainState');
+      unsubscribeMainState = onSnapshot(mainStateDoc, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           if (data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
             workoutSessions = data.sessions;
+            // Asegurar integridad de ids y types
+            workoutSessions.forEach(sess => {
+              if (Array.isArray(sess.exercises)) {
+                sess.exercises.forEach(ex => {
+                  if (!ex.id) ex.id = generateId('ex');
+                  if (!ex.type) ex.type = 'reps';
+                });
+              }
+            });
+            localStorage.setItem('fit_sessions', JSON.stringify(workoutSessions));
+            renderAll();
           }
-          if (data.logs && Array.isArray(data.logs)) {
-            workoutLogs = data.logs;
-          }
-          localStorage.setItem('fit_sessions', JSON.stringify(workoutSessions));
-          localStorage.setItem('fit_logs', JSON.stringify(workoutLogs));
-          renderAll();
         } else {
-          saveState();
+          saveSessionsState();
         }
-      }, (err) => console.warn("Firestore sync:", err));
+      }, (err) => console.warn("Firestore sync mainState:", err));
+
+      // 2. Histórico de entrenamientos como subcolección
+      const logsSubcollection = collection(db, 'artifacts', appId, 'users', userId, 'workoutLogs');
+      const q = query(logsSubcollection, orderBy('date', 'desc'), limit(150));
+      
+      unsubscribeWorkoutLogs = onSnapshot(q, (snapshot) => {
+        const loadedLogs = [];
+        snapshot.forEach(docSnap => {
+          loadedLogs.push({ id: docSnap.id, ...docSnap.data() });
+        });
+
+        // Si la subcolección tiene datos remotos, se sincronizan
+        if (loadedLogs.length > 0) {
+          workoutLogs = loadedLogs;
+          localStorage.setItem('fit_logs', JSON.stringify(workoutLogs));
+          renderCalendar();
+        } else if (workoutLogs.length > 0) {
+          // Migración de datos locales hacia la subcolección de Firestore
+          workoutLogs.forEach(localLog => {
+            const logId = localLog.id || generateId('log');
+            const logDocRef = doc(db, 'artifacts', appId, 'users', userId, 'workoutLogs', logId);
+            setDoc(logDocRef, localLog, { merge: true }).catch(err => console.error("Error migrando log:", err));
+          });
+        }
+      }, (err) => console.warn("Firestore sync workoutLogs:", err));
     }
 
-    function saveState() {
+    function saveSessionsState() {
       localStorage.setItem('fit_sessions', JSON.stringify(workoutSessions));
-      localStorage.setItem('fit_logs', JSON.stringify(workoutLogs));
-
       if (db && currentUser) {
         const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'userWorkouts', 'mainState');
         setDoc(docRef, {
           sessions: workoutSessions,
-          logs: workoutLogs,
           updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(err => console.error("Error guardando en Firestore:", err));
+        }, { merge: true }).catch(err => console.error("Error guardando sesiones en Firestore:", err));
       }
       renderAll();
+    }
+
+    async function persistNewWorkoutLog(newLog) {
+      workoutLogs.unshift(newLog);
+      localStorage.setItem('fit_logs', JSON.stringify(workoutLogs));
+
+      if (db && currentUser) {
+        try {
+          const logDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs', newLog.id);
+          await setDoc(logDocRef, newLog);
+        } catch (err) {
+          console.error("Error persistiendo log en Firestore subcollection:", err);
+        }
+      }
     }
 
     function getActiveSession() {
@@ -642,7 +726,10 @@
 
       session.exercises.forEach(ex => {
         if (ex.status === 'completed') {
-          totalVolume += (ex.sets * ex.reps * (ex.weight || 0));
+          // Solo ejercicios con tipo repeticiones cuentan para el volumen en kg
+          if (ex.type !== 'time') {
+            totalVolume += (ex.sets * ex.reps * (ex.weight || 0));
+          }
           completedCount++;
         }
       });
@@ -679,6 +766,7 @@
         const isCompleted = ex.status === 'completed';
         const isSkipped = ex.status === 'skipped';
         const isFeedbackOpen = openFeedbackIndex === idx;
+        const isTimeBased = ex.type === 'time';
 
         const item = document.createElement('div');
         item.className = `bg-white border rounded-xl transition shadow-sm overflow-hidden ${
@@ -706,9 +794,10 @@
               <div class="min-w-0 flex-1">
                 <div class="font-bold text-slate-800 text-xs truncate ${isSkipped ? 'line-through text-rose-700/70' : ''}">${escapeHtml(ex.name)}</div>
                 <div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
-                  <span class="font-semibold text-slate-700">${ex.sets}×${ex.reps}</span>
+                  <span class="font-semibold text-slate-700">${ex.sets}×${isTimeBased ? `${ex.reps}s` : ex.reps}</span>
                   <span class="text-slate-300">•</span>
                   <span class="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 text-[10px]">${ex.weight} kg</span>
+                  ${isTimeBased ? `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-1 py-0.2 rounded text-[9px] font-medium"><i class="fa-solid fa-stopwatch text-[8px] mr-0.5"></i>Tiempo</span>` : ''}
                   ${ex.tempo ? `<span class="bg-violet-50 text-violet-700 border border-violet-100 px-1 py-0.2 rounded text-[9px] font-medium"><i class="fa-solid fa-stopwatch text-[8px] mr-0.5"></i>${escapeHtml(ex.tempo)}</span>` : ''}
                   ${ex.rpe ? `<span class="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-medium border border-slate-200">RPE ${ex.rpe}</span>` : ''}
                 </div>
@@ -781,6 +870,21 @@
         list.appendChild(item);
       });
     }
+
+    window.updateUnitsLabel = function() {
+      const typeSelect = document.getElementById('modalExType');
+      const label = document.getElementById('modalUnitsLabel');
+      const input = document.getElementById('modalExReps');
+      if (typeSelect && label && input) {
+        if (typeSelect.value === 'time') {
+          label.textContent = "Segundos";
+          input.placeholder = "60";
+        } else {
+          label.textContent = "Reps Meta";
+          input.placeholder = "10";
+        }
+      }
+    };
 
     window.toggleLoginModal = function() {
       const modal = document.getElementById('loginModal');
@@ -858,24 +962,26 @@
       if (!nameInput) return;
 
       workoutSessions.push({
-        id: "sess_" + Date.now(),
+        id: generateId("sess"),
         name: nameInput,
         lastCompleted: null,
         exercises: []
       });
       activeSessionIndex = workoutSessions.length - 1;
       closeNewSessionModal();
-      saveState();
+      saveSessionsState();
     };
 
     window.openAddExerciseModal = function() {
       document.getElementById('exerciseModalTitle').textContent = 'Añadir Ejercicio';
       document.getElementById('editExerciseIndex').value = '-1';
       document.getElementById('modalExName').value = '';
+      document.getElementById('modalExType').value = 'reps';
       document.getElementById('modalExSets').value = '3';
       document.getElementById('modalExReps').value = '10';
       document.getElementById('modalExWeight').value = '0';
       document.getElementById('modalExTempo').value = '';
+      window.updateUnitsLabel();
       document.getElementById('exerciseModal').classList.remove('hidden');
     };
 
@@ -886,7 +992,7 @@
       if (current === 'pending') session.exercises[index].status = 'completed';
       else if (current === 'completed') session.exercises[index].status = 'skipped';
       else session.exercises[index].status = 'pending';
-      saveState();
+      saveSessionsState();
     };
 
     window.toggleExerciseFeedbackPanel = function(idx) {
@@ -904,7 +1010,7 @@
       session.exercises[idx].notes = document.getElementById(`exNotes_${idx}`).value.trim();
 
       openFeedbackIndex = null;
-      saveState();
+      saveSessionsState();
     };
 
     window.promptDeleteExercise = function(index) {
@@ -923,7 +1029,7 @@
       if (session) {
         session.exercises.splice(exerciseToDeleteIndex, 1);
         openFeedbackIndex = null;
-        saveState();
+        saveSessionsState();
       }
       closeDeleteConfirmModal();
     };
@@ -936,10 +1042,12 @@
       document.getElementById('exerciseModalTitle').textContent = 'Editar Ejercicio';
       document.getElementById('editExerciseIndex').value = idx;
       document.getElementById('modalExName').value = ex.name;
+      document.getElementById('modalExType').value = ex.type || 'reps';
       document.getElementById('modalExSets').value = ex.sets;
       document.getElementById('modalExReps').value = ex.reps;
       document.getElementById('modalExWeight').value = ex.weight;
       document.getElementById('modalExTempo').value = ex.tempo || '';
+      window.updateUnitsLabel();
       document.getElementById('exerciseModal').classList.remove('hidden');
     };
 
@@ -954,6 +1062,7 @@
 
       const idx = parseInt(document.getElementById('editExerciseIndex').value);
       const name = document.getElementById('modalExName').value.trim();
+      const type = document.getElementById('modalExType').value || 'reps';
       const sets = parseInt(document.getElementById('modalExSets').value);
       const reps = parseInt(document.getElementById('modalExReps').value);
       const weight = parseFloat(document.getElementById('modalExWeight').value) || 0;
@@ -961,7 +1070,8 @@
 
       if (idx === -1) {
         session.exercises.push({
-          name, sets, reps, weight, tempo,
+          id: generateId('ex'),
+          name, type, sets, reps, weight, tempo,
           status: 'pending',
           sensation: 'Adecuada',
           rpe: '8',
@@ -969,6 +1079,7 @@
         });
       } else {
         session.exercises[idx].name = name;
+        session.exercises[idx].type = type;
         session.exercises[idx].sets = sets;
         session.exercises[idx].reps = reps;
         session.exercises[idx].weight = weight;
@@ -976,10 +1087,10 @@
       }
 
       closeExerciseModal();
-      saveState();
+      saveSessionsState();
     });
 
-    window.completeCurrentWorkoutSession = function() {
+    window.completeCurrentWorkoutSession = async function() {
       const session = getActiveSession();
       if (!session) return;
 
@@ -990,20 +1101,32 @@
       }
 
       const now = new Date();
+      const localDateStr = getLocalDateString(now);
       session.lastCompleted = now.toISOString();
 
-      workoutLogs.unshift({
-        id: "log_" + Date.now(),
+      // Cálculo de volumen excluyendo ejercicios por tiempo (planchas, etc.)
+      const sessionVolume = session.exercises.reduce((acc, ex) => {
+        if (ex.status === 'completed' && ex.type !== 'time') {
+          return acc + (ex.sets * ex.reps * (ex.weight || 0));
+        }
+        return acc;
+      }, 0);
+
+      const newLog = {
+        id: generateId("log"),
         sessionName: session.name,
         date: now.toISOString(),
+        localDate: localDateStr, // Fecha local normalizada YYYY-MM-DD
         exercisesCount: session.exercises.length,
         completedCount: completedCount,
-        volume: session.exercises.reduce((acc, ex) => ex.status === 'completed' ? acc + (ex.sets * ex.reps * (ex.weight || 0)) : acc, 0),
+        volume: sessionVolume,
         exercisesDetail: session.exercises.map(e => ({ ...e }))
-      });
+      };
+
+      await persistNewWorkoutLog(newLog);
 
       session.exercises.forEach(ex => { ex.status = 'pending'; });
-      saveState();
+      saveSessionsState();
       alert("¡Entrenamiento guardado con éxito en tu historial!");
     };
 
@@ -1034,7 +1157,9 @@
 
       const logsByDate = {};
       workoutLogs.forEach(log => {
-        const dateKey = log.date.slice(0, 10);
+        // Usar localDate si existe, o calcular la fecha local sobre la marca temporal
+        const dObj = new Date(log.date);
+        const dateKey = log.localDate || getLocalDateString(dObj);
         if (!logsByDate[dateKey]) logsByDate[dateKey] = [];
         logsByDate[dateKey].push(log);
       });
@@ -1050,14 +1175,11 @@
         grid.appendChild(empty);
       }
 
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = getLocalDateString(new Date());
 
       for (let day = 1; day <= daysInMonth; day++) {
         const dateObj = new Date(year, month, day);
-        const yyyy = dateObj.getFullYear();
-        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(dateObj.getDate()).padStart(2, '0');
-        const dateStr = `${yyyy}-${mm}-${dd}`;
+        const dateStr = getLocalDateString(dateObj);
 
         const hasLogs = !!logsByDate[dateStr];
         const isSelected = selectedCalendarDateStr === dateStr;
@@ -1088,8 +1210,9 @@
       const badge = document.getElementById('selectedDateBadge');
       if (!container || !title || !badge) return;
 
-      const d = new Date(dateStr + 'T00:00:00');
-      title.textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const localDayObj = new Date(y, m - 1, d);
+      title.textContent = localDayObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
       badge.textContent = `${logs.length} ${logs.length === 1 ? 'sesión' : 'sesiones'}`;
       container.innerHTML = '';
 
@@ -1116,7 +1239,7 @@
       });
     }
 
-    // Gemini API con gemini-1.5-flash y URL limpia
+    // Gemini API con identificación por ID y validación estricta de cambios (+-15kg)
     window.analyzeSessionWithGemini = async function() {
       if (!currentUser || !geminiApiKey) {
         alert("Debes iniciar sesión con tu cuenta para usar el análisis de IA.");
@@ -1135,18 +1258,33 @@
       btn.disabled = true;
       btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analizando con Gemini...`;
 
+      // Se envían los IDs exactos para que la IA responda por ID y no por texto libre
       const prompt = `Analiza el feedback de mi sesión de entrenamiento e indica ajustes de carga para la próxima sesión en kg.
 Sesión: "${session.name}"
-Ejercicios completados/pendientes: ${JSON.stringify(session.exercises)}
+Lista de ejercicios (con id único, peso actual y sensaciones):
+${JSON.stringify(session.exercises.map(e => ({
+  id: e.id,
+  name: e.name,
+  type: e.type || 'reps',
+  weight: e.weight,
+  status: e.status,
+  sensation: e.sensation,
+  rpe: e.rpe,
+  notes: e.notes
+})))}
 
 Instrucciones:
-1. Si un ejercicio fue Omitido/skipped, no subas peso.
-2. Si la sensación fue 'Ligera' o RPE 6-7, propone una subida moderada (+1kg a +5kg según ejercicio).
+1. Si un ejercicio fue Omitido/skipped, no aumentes el peso.
+2. Si la sensación fue 'Ligera' o RPE 6-7, propone una subida moderada (+1kg a +5kg según el ejercicio).
 3. Si la sensación fue 'Muy Pesada' o RPE 10, mantén o reduce ligeramente la carga.
-4. Devuelve ÚNICAMENTE un objeto JSON válido con este formato:
+4. Para ejercicios 'time' (isométricos/tiempo), si no llevan peso lastrado se mantiene peso en 0.
+5. Los pesos deben ser números positivos reales y nunca saltar más de +-10kg respecto al peso actual.
+6. Devuelve ÚNICAMENTE un objeto JSON válido con la siguiente estructura donde las llaves de suggestedWeights sean los 'id' exactos recibidos:
 {
   "explanation": "resumen breve y motivador de los ajustes sugeridos",
-  "suggestedWeights": { "Nombre Exacto Ejercicio": 62.5 }
+  "suggestedWeights": {
+    "ex_id_ejemplo": 62.5
+  }
 }`;
 
       const key = String(geminiApiKey).trim();
@@ -1198,18 +1336,29 @@ Instrucciones:
       const session = getActiveSession();
 
       session.exercises.forEach(ex => {
-        if (pendingSuggestedWeights[ex.name] !== undefined) {
-          ex.weight = pendingSuggestedWeights[ex.name];
-          ex.status = 'pending';
+        // Comprobar coincidencia por ID único (o compatibilidad retrospectiva por nombre)
+        const newWeightCandidate = pendingSuggestedWeights[ex.id] !== undefined 
+          ? pendingSuggestedWeights[ex.id] 
+          : pendingSuggestedWeights[ex.name];
+
+        if (newWeightCandidate !== undefined) {
+          const numWeight = Number(newWeightCandidate);
+          // Validación: debe ser número, positivo y no desviarse más de 15 kg respecto a la carga actual
+          if (!isNaN(numWeight) && numWeight >= 0 && Math.abs(numWeight - (ex.weight || 0)) <= 15) {
+            ex.weight = numWeight;
+            ex.status = 'pending';
+          } else {
+            console.warn(`Peso descartado para ${ex.name} por no ser razonable:`, newWeightCandidate);
+          }
         }
       });
 
       pendingSuggestedWeights = null;
       document.getElementById('aiSuggestionBox').classList.add('hidden');
-      saveState();
+      saveSessionsState();
     };
 
-    // Chat AI Coach con gemini-1.5-flash y URL limpia
+    // Chat AI Coach con gemini-1.5-flash y contexto completo de sesión
     window.sendCoachQuery = async function() {
       if (!currentUser || !geminiApiKey) {
         alert("Debes iniciar sesión con tu cuenta para usar el Coach.");
@@ -1238,9 +1387,9 @@ Instrucciones:
       chatLog.scrollTop = chatLog.scrollHeight;
 
       const key = String(geminiApiKey).trim();
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`;
       const session = getActiveSession();
-      const promptText = `Eres un entrenador personal certificado. Responde breve a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.\n\nPregunta: ${queryText}`;
+      const promptText = `Eres un entrenador personal certificado. Responde breve y con rigor a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.\n\nPregunta: ${queryText}`;
 
       try {
         const response = await fetch(apiUrl, {
