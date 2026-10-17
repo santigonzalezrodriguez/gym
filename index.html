@@ -2,15 +2,17 @@
 <html lang="es" class="h-full bg-slate-50">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FitTracker AI - Entrenamientos Inteligentes</title>
 
-  <!-- PWA Capabilities -->
+  <!-- PWA & Mobile Web App Meta Tags -->
+  <link rel="manifest" href="./manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FitTracker AI">
   <meta name="theme-color" content="#4f46e5">
+  <link rel="apple-touch-icon" href="./icon-192.png">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -20,14 +22,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Inter', sans-serif; }
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-full flex flex-col pb-16">
+<body class="bg-slate-50 text-slate-800 min-h-full flex flex-col pb-16 select-none">
 
   <!-- Header principal -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
@@ -49,8 +50,6 @@
         <button onclick="toggleCoachModal()" title="Consultar al Entrenador IA" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1.5 rounded-xl transition text-xs font-semibold flex items-center gap-1 border border-indigo-200">
           <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i> Coach
         </button>
-
-        <!-- Botón de Login (Solo icono) -->
         <button onclick="toggleLoginModal()" id="btnLoginIcon" title="Iniciar sesión" class="w-9 h-9 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition">
           <i id="userHeaderIcon" class="fa-solid fa-user text-sm"></i>
         </button>
@@ -76,8 +75,6 @@
           </button>
         </div>
       </div>
-
-      <!-- Badges de Sesión -->
       <div id="sessionTabs" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"></div>
     </section>
 
@@ -134,7 +131,6 @@
           </button>
         </div>
       </div>
-
       <div id="exerciseList" class="space-y-2"></div>
     </section>
 
@@ -164,23 +160,19 @@
       </div>
 
       <div id="loggedOutContent" class="space-y-3">
-        <p class="text-xs text-slate-500">Inicia sesión con tu cuenta para sincronizar tus rutinas en la nube con Firestore.</p>
-
+        <p class="text-xs text-slate-500">Inicia sesión para habilitar el AI Coach y sincronizar tus rutinas en Firestore.</p>
         <div id="authErrorMessage" class="hidden text-[11px] bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl leading-relaxed"></div>
-
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Correo electrónico</label>
           <input type="email" id="loginEmail" placeholder="usuario@email.com" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
         </div>
-
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
           <input type="password" id="loginPassword" placeholder="••••••••" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
             onkeydown="if(event.key==='Enter') performLogin()">
         </div>
-
         <div class="pt-2">
           <button onclick="performLogin()" id="btnLoginSubmit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
             <span>Iniciar Sesión</span>
@@ -192,11 +184,11 @@
         <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 space-y-1">
           <div class="font-bold flex items-center gap-1.5">
             <i class="fa-solid fa-circle-check"></i>
-            <span>Sesión iniciada con éxito</span>
+            <span>Sesión iniciada</span>
           </div>
           <div id="userEmailDisplay" class="font-mono text-[11px] text-slate-600 truncate"></div>
         </div>
-        <p class="text-slate-500 text-[11px]">Tus rutinas y registros se están sincronizando automáticamente con Firestore en la nube.</p>
+        <p class="text-slate-500 text-[11px]">Tus rutinas y funciones de IA están activas y sincronizadas.</p>
         <div class="pt-2">
           <button onclick="performLogout()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2 rounded-xl text-xs font-bold transition">
             Cerrar Sesión
@@ -220,10 +212,9 @@
         <input type="hidden" id="editExerciseIndex" value="-1">
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre del Ejercicio</label>
-          <input type="text" id="modalExName" placeholder="Ej. Press de Banca, Dominadas..." required
+          <input type="text" id="modalExName" placeholder="Ej. Press Banca, Sentadilla..." required
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
         </div>
-
         <div class="grid grid-cols-3 gap-2">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Series</label>
@@ -241,14 +232,11 @@
               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
           </div>
         </div>
-
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Tempo (Opcional)</label>
           <input type="text" id="modalExTempo" placeholder="Ej. 3-1-1-0" 
             class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
-          <span class="text-[10px] text-slate-400">Excéntrica - Pausa abajo - Concéntrica - Pausa arriba</span>
         </div>
-
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
           <button type="button" onclick="closeExerciseModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
           <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Guardar</button>
@@ -266,15 +254,11 @@
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
-
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Sesión</label>
-          <input type="text" id="newSessionNameInput" placeholder="Ej. Sesión 4: Torso Fuerza..." 
-            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
-        </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Sesión</label>
+        <input type="text" id="newSessionNameInput" placeholder="Ej. Sesión 4: Torso..." 
+          class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
       </div>
-
       <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
         <button onclick="closeNewSessionModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
         <button onclick="createNewSession()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Crear Sesión</button>
@@ -294,36 +278,32 @@
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
-
-      <div class="space-y-3 text-xs text-slate-600 leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
-        <p>El <strong>RPE (Rating of Perceived Exertion)</strong> mide la intensidad del esfuerzo en función de las repeticiones en recámara (RIR):</p>
-        <div class="space-y-2">
-          <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <span class="font-bold text-emerald-800">RPE 6 - 7 (Ligero):</span>
-            <p class="text-[11px] text-emerald-700">Podías hacer 3 a 4 repeticiones más antes de fallar. Carga manejable.</p>
-          </div>
-          <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl">
-            <span class="font-bold text-indigo-800">RPE 8 (Punto Óptimo Hipertrofia):</span>
-            <p class="text-[11px] text-indigo-700">Te quedaban 2 repeticiones en recámara. Máximo estímulo con fatiga controlada.</p>
-          </div>
-          <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
-            <span class="font-bold text-amber-800">RPE 9 (Muy Pesado):</span>
-            <p class="text-[11px] text-amber-700">Solo 1 repetición en recámara. Esfuerzo máximo con técnica correcta.</p>
-          </div>
-          <div class="p-2.5 bg-rose-50 border border-rose-200 rounded-xl">
-            <span class="font-bold text-rose-800">RPE 10 (Fallo Técnico/Total):</span>
-            <p class="text-[11px] text-rose-700">0 repeticiones restantes. Mantener o consolidar la carga.</p>
-          </div>
+      <div class="space-y-2 text-xs text-slate-600 leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
+        <p>El <strong>RPE (Rating of Perceived Exertion)</strong> mide la intensidad del esfuerzo:</p>
+        <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <span class="font-bold text-emerald-800">RPE 6 - 7 (Ligero):</span>
+          <p class="text-[11px] text-emerald-700">3 a 4 repeticiones en recámara antes de fallar.</p>
+        </div>
+        <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl">
+          <span class="font-bold text-indigo-800">RPE 8 (Punto Óptimo):</span>
+          <p class="text-[11px] text-indigo-700">2 repeticiones en recámara. Máximo estímulo de hipertrofia.</p>
+        </div>
+        <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+          <span class="font-bold text-amber-800">RPE 9 (Muy Pesado):</span>
+          <p class="text-[11px] text-amber-700">Solo 1 repetición en recámara con buena técnica.</p>
+        </div>
+        <div class="p-2.5 bg-rose-50 border border-rose-200 rounded-xl">
+          <span class="font-bold text-rose-800">RPE 10 (Fallo Total):</span>
+          <p class="text-[11px] text-rose-700">0 repeticiones restantes. Mantener peso para consolidar.</p>
         </div>
       </div>
-
       <div class="flex justify-end pt-2 border-t border-slate-100">
         <button onclick="toggleRpeGuideModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Entendido</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal Histórico con Calendario -->
+  <!-- Modal Histórico -->
   <div id="historyModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
       <div class="flex justify-between items-center border-b border-slate-100 pb-3">
@@ -339,19 +319,13 @@
       <div class="space-y-4 flex-1 overflow-y-auto pr-1">
         <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-2">
           <div class="flex justify-between items-center px-1">
-            <button onclick="changeCalendarMonth(-1)" class="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-200 rounded-lg transition">
-              <i class="fa-solid fa-chevron-left text-xs"></i>
-            </button>
+            <button onclick="changeCalendarMonth(-1)" class="p-1.5 text-slate-600 hover:text-indigo-600 rounded-lg transition"><i class="fa-solid fa-chevron-left text-xs"></i></button>
             <span id="calendarMonthLabel" class="text-xs font-bold text-slate-800 capitalize"></span>
-            <button onclick="changeCalendarMonth(1)" class="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-200 rounded-lg transition">
-              <i class="fa-solid fa-chevron-right text-xs"></i>
-            </button>
+            <button onclick="changeCalendarMonth(1)" class="p-1.5 text-slate-600 hover:text-indigo-600 rounded-lg transition"><i class="fa-solid fa-chevron-right text-xs"></i></button>
           </div>
-
           <div class="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase pt-1">
             <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
           </div>
-
           <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-xs"></div>
         </div>
 
@@ -376,7 +350,7 @@
           </div>
           <div>
             <h3 class="text-sm font-bold text-slate-900">AI Coach Personal</h3>
-            <p class="text-[10px] text-slate-500">Consulta sustitutos, técnica y dudas de tu rutina</p>
+            <p class="text-[10px] text-slate-500">Consulta sustitutos, descansos y técnica</p>
           </div>
         </div>
         <button onclick="toggleCoachModal()" class="text-slate-400 hover:text-slate-600 p-1">
@@ -391,7 +365,7 @@
       </div>
 
       <div class="pt-2 border-t border-slate-100 flex gap-2 shrink-0">
-        <input type="text" id="coachPromptInput" placeholder="Ej. ¿Cómo puedo calentar antes de hacer sentadilla?" 
+        <input type="text" id="coachPromptInput" placeholder="Ej. ¿Cómo calentar antes de hacer sentadilla?" 
           class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
           onkeydown="if(event.key==='Enter') sendCoachQuery()">
         <button onclick="sendCoachQuery()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition">
@@ -401,7 +375,7 @@
     </div>
   </div>
 
-  <!-- Modal Confirmación Borrado Ejercicio -->
+  <!-- Modal Borrado -->
   <div id="deleteConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-xs space-y-4 shadow-2xl text-center">
       <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">
@@ -418,13 +392,13 @@
     </div>
   </div>
 
-  <!-- Script Principal con Firebase Modular y Gemini -->
+  <!-- Lógica Modular Firebase y Gemini -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Credenciales con la clave corregida (ZJbms5M)
+    // Configuración pública de Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBxDsbym6-ONm-mW7Ldx3pXxmF_ZJbms5M",
       authDomain: "gym-tracker-b1669.firebaseapp.com",
@@ -436,7 +410,9 @@
     };
 
     const appId = "fit-tracker-app";
-    const geminiApiKey = "AIzaSyB3Zkw1ubXzz9j9SqSQpeaBlWdTJ6hSvHE";
+    
+    // La clave ya no está en el código. Se lee de Firestore tras autenticarte.
+    let geminiApiKey = null;
 
     let app = null;
     let auth = null;
@@ -502,12 +478,14 @@
       auth = getAuth(app);
       db = getFirestore(app);
 
-      onAuthStateChanged(auth, (user) => {
+      onAuthStateChanged(auth, async (user) => {
         currentUser = user;
         updateAuthUI(user);
         if (user) {
+          await loadGeminiApiKey();
           attachFirestoreListener(user.uid);
         } else {
+          geminiApiKey = null;
           if (unsubscribeSnapshot) {
             unsubscribeSnapshot();
             unsubscribeSnapshot = null;
@@ -516,8 +494,23 @@
         }
       });
     } catch (e) {
-      console.error("Error al inicializar Firebase:", e);
+      console.error("Error Firebase:", e);
       renderAll();
+    }
+
+    // Carga de la API Key desde Firestore (solo accesible si estás logado)
+    async function loadGeminiApiKey() {
+      if (!db || !currentUser) return;
+      try {
+        const configDoc = await getDoc(doc(db, 'config', 'gemini'));
+        if (configDoc.exists()) {
+          geminiApiKey = configDoc.data().apiKey;
+        } else {
+          console.warn("No se encontró el documento /config/gemini en Firestore.");
+        }
+      } catch (err) {
+        console.warn("Error leyendo la clave de Gemini desde Firestore:", err);
+      }
     }
 
     function updateAuthUI(user) {
@@ -552,13 +545,9 @@
 
     function attachFirestoreListener(userId) {
       if (!db || !userId) return;
-
-      if (unsubscribeSnapshot) {
-        unsubscribeSnapshot();
-      }
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
 
       const docRef = doc(db, 'artifacts', appId, 'users', userId, 'userWorkouts', 'mainState');
-      
       unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -574,9 +563,7 @@
         } else {
           saveState();
         }
-      }, (err) => {
-        console.warn("Aviso Firestore onSnapshot:", err);
-      });
+      }, (err) => console.warn("Firestore sync:", err));
     }
 
     function saveState() {
@@ -589,9 +576,7 @@
           sessions: workoutSessions,
           logs: workoutLogs,
           updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(err => {
-          console.error("Error guardando en Firestore:", err);
-        });
+        }, { merge: true }).catch(err => console.error("Error guardando en Firestore:", err));
       }
       renderAll();
     }
@@ -613,9 +598,7 @@
       if (!tabs) return;
       tabs.innerHTML = '';
 
-      if (activeSessionIndex >= workoutSessions.length) {
-        activeSessionIndex = 0;
-      }
+      if (activeSessionIndex >= workoutSessions.length) activeSessionIndex = 0;
 
       workoutSessions.forEach((sess, idx) => {
         const isActive = idx === activeSessionIndex;
@@ -654,7 +637,6 @@
 
       let totalVolume = 0;
       let completedCount = 0;
-
       if (!session.exercises) session.exercises = [];
 
       session.exercises.forEach(ex => {
@@ -675,8 +657,7 @@
 
       const circle = document.getElementById('sessionProgressCircle');
       if (circle) {
-        const dashOffset = 88 - (88 * progressPercent / 100);
-        circle.style.strokeDashoffset = dashOffset;
+        circle.style.strokeDashoffset = 88 - (88 * progressPercent / 100);
       }
 
       const badgeEl = document.getElementById('exerciseCountBadge');
@@ -710,7 +691,7 @@
         item.innerHTML = `
           <div class="p-3 flex items-center justify-between gap-2">
             <div class="flex items-center gap-2.5 flex-1 min-w-0">
-              <button onclick="window.toggleExerciseStatus(${idx})" title="Hecho / Omitido / Pendiente" 
+              <button onclick="window.toggleExerciseStatus(${idx})" 
                 class="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition border ${
                   isCompleted 
                     ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' 
@@ -723,7 +704,6 @@
 
               <div class="min-w-0 flex-1">
                 <div class="font-bold text-slate-800 text-xs truncate ${isSkipped ? 'line-through text-rose-700/70' : ''}">${escapeHtml(ex.name)}</div>
-                
                 <div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
                   <span class="font-semibold text-slate-700">${ex.sets}×${ex.reps}</span>
                   <span class="text-slate-300">•</span>
@@ -776,16 +756,16 @@
                   <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Escala RPE</label>
                   <select id="exRPE_${idx}" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
                     <option value="6-7" ${ex.rpe === '6-7' ? 'selected' : ''}>RPE 6-7 (+3-4 reps)</option>
-                    <option value="8" ${(!ex.rpe || ex.rpe === '8') ? 'selected' : ''}>RPE 8 (2 reps recámara)</option>
-                    <option value="9" ${ex.rpe === '9' ? 'selected' : ''}>RPE 9 (1 rep recámara)</option>
-                    <option value="10" ${ex.rpe === '10' ? 'selected' : ''}>RPE 10 (Fallo máximo)</option>
+                    <option value="8" ${(!ex.rpe || ex.rpe === '8') ? 'selected' : ''}>RPE 8 (2 reps)</option>
+                    <option value="9" ${ex.rpe === '9' ? 'selected' : ''}>RPE 9 (1 rep)</option>
+                    <option value="10" ${ex.rpe === '10' ? 'selected' : ''}>RPE 10 (Fallo)</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Notas técnicas</label>
-                <input type="text" id="exNotes_${idx}" value="${escapeHtml(ex.notes || '')}" placeholder="Ej. Buena técnica, subir 2.5kg..." 
+                <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Notas</label>
+                <input type="text" id="exNotes_${idx}" value="${escapeHtml(ex.notes || '')}" placeholder="Sensaciones..." 
                   class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
               </div>
 
@@ -801,7 +781,6 @@
       });
     }
 
-    // Funciones del Modal de Autenticación
     window.toggleLoginModal = function() {
       const modal = document.getElementById('loginModal');
       if (modal) modal.classList.toggle('hidden');
@@ -828,20 +807,10 @@
       try {
         await signInWithEmailAndPassword(auth, email, password);
         document.getElementById('loginPassword').value = '';
-        setTimeout(() => {
-          window.toggleLoginModal();
-        }, 500);
+        setTimeout(() => window.toggleLoginModal(), 500);
       } catch (err) {
-        console.error("Error al iniciar sesión:", err);
-        let msg = `Error (${err.code}): ${err.message}`;
-        if (err.code === 'auth/operation-not-allowed') {
-          msg = "El proveedor de Email/Password no está habilitado en tu consola de Firebase.";
-        } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
-          msg = "Credenciales incorrectas. Verifica tu email y contraseña.";
-        } else if (err.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') {
-          msg = "API Key no válida. Revisa los permisos y restricciones en Google Cloud.";
-        }
-        errBox.textContent = msg;
+        console.error("Login error:", err);
+        errBox.textContent = `Error (${err.code}): ${err.message}`;
         errBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
@@ -852,9 +821,10 @@
     window.performLogout = async function() {
       try {
         await signOut(auth);
+        geminiApiKey = null;
         window.toggleLoginModal();
       } catch (err) {
-        alert("Error al cerrar sesión: " + err.message);
+        alert("Error: " + err.message);
       }
     };
 
@@ -864,6 +834,11 @@
     };
 
     window.toggleCoachModal = function() {
+      if (!currentUser) {
+        alert("Debes iniciar sesión con tu cuenta para consultar al Coach IA.");
+        window.toggleLoginModal();
+        return;
+      }
       const modal = document.getElementById('coachModal');
       if (modal) modal.classList.toggle('hidden');
     };
@@ -879,19 +854,14 @@
 
     window.createNewSession = function() {
       const nameInput = document.getElementById('newSessionNameInput').value.trim();
-      if (!nameInput) {
-        alert("Escribe un nombre para la sesión.");
-        return;
-      }
+      if (!nameInput) return;
 
-      const newSess = {
+      workoutSessions.push({
         id: "sess_" + Date.now(),
         name: nameInput,
         lastCompleted: null,
         exercises: []
-      };
-
-      workoutSessions.push(newSess);
+      });
       activeSessionIndex = workoutSessions.length - 1;
       closeNewSessionModal();
       saveState();
@@ -938,14 +908,12 @@
 
     window.promptDeleteExercise = function(index) {
       exerciseToDeleteIndex = index;
-      const modal = document.getElementById('deleteConfirmModal');
-      if (modal) modal.classList.remove('hidden');
+      document.getElementById('deleteConfirmModal').classList.remove('hidden');
     };
 
     window.closeDeleteConfirmModal = function() {
       exerciseToDeleteIndex = null;
-      const modal = document.getElementById('deleteConfirmModal');
-      if (modal) modal.classList.add('hidden');
+      document.getElementById('deleteConfirmModal').classList.add('hidden');
     };
 
     window.confirmDeleteExercise = function() {
@@ -1016,7 +984,7 @@
 
       const completedCount = session.exercises.filter(e => e.status === 'completed').length;
       if (completedCount === 0) {
-        alert("Marca al menos un ejercicio como realizado antes de guardar.");
+        alert("Marca al menos un ejercicio como realizado.");
         return;
       }
 
@@ -1034,7 +1002,6 @@
       });
 
       session.exercises.forEach(ex => { ex.status = 'pending'; });
-
       saveState();
       alert("¡Entrenamiento guardado con éxito en tu historial!");
     };
@@ -1042,8 +1009,7 @@
     window.toggleHistoryModal = function() {
       const modal = document.getElementById('historyModal');
       if (!modal) return;
-      const isHidden = modal.classList.contains('hidden');
-      if (isHidden) {
+      if (modal.classList.contains('hidden')) {
         renderCalendar();
         modal.classList.remove('hidden');
       } else {
@@ -1059,7 +1025,6 @@
     function renderCalendar() {
       const year = currentCalendarDate.getFullYear();
       const month = currentCalendarDate.getMonth();
-
       const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
       document.getElementById('calendarMonthLabel').textContent = `${monthNames[month]} ${year}`;
 
@@ -1073,16 +1038,15 @@
         logsByDate[dateKey].push(log);
       });
 
-      const firstDayOfMonth = new Date(year, month, 1);
-      let startingDay = firstDayOfMonth.getDay() - 1;
+      const firstDay = new Date(year, month, 1);
+      let startingDay = firstDay.getDay() - 1;
       if (startingDay === -1) startingDay = 6;
-
       const daysInMonth = new Date(year, month + 1, 0).getDate();
 
       for (let i = 0; i < startingDay; i++) {
-        const emptyCell = document.createElement('div');
-        emptyCell.className = "h-8 rounded-lg bg-transparent";
-        grid.appendChild(emptyCell);
+        const empty = document.createElement('div');
+        empty.className = "h-8 bg-transparent";
+        grid.appendChild(empty);
       }
 
       const todayStr = new Date().toISOString().slice(0, 10);
@@ -1100,29 +1064,20 @@
 
         const cell = document.createElement('button');
         cell.className = `h-8 text-xs font-semibold rounded-xl flex flex-col items-center justify-center relative transition ${
-          isSelected 
-            ? 'bg-indigo-600 text-white shadow-md' 
-            : isToday 
-              ? 'bg-indigo-100 text-indigo-700 font-bold border border-indigo-200' 
-              : 'hover:bg-slate-100 text-slate-700'
+          isSelected ? 'bg-indigo-600 text-white shadow-md' : isToday ? 'bg-indigo-100 text-indigo-700 font-bold border border-indigo-200' : 'hover:bg-slate-100 text-slate-700'
         }`;
-
         cell.onclick = () => {
           selectedCalendarDateStr = dateStr;
           renderCalendar();
         };
-
         cell.innerHTML = `<span>${day}</span>`;
-
         if (hasLogs) {
           const dot = document.createElement('span');
           dot.className = `w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-amber-300' : 'bg-indigo-600'}`;
           cell.appendChild(dot);
         }
-
         grid.appendChild(cell);
       }
-
       renderDayLogs(selectedCalendarDateStr, logsByDate[selectedCalendarDateStr] || []);
     }
 
@@ -1130,17 +1085,15 @@
       const container = document.getElementById('dayLogsContainer');
       const title = document.getElementById('selectedDateTitle');
       const badge = document.getElementById('selectedDateBadge');
-
       if (!container || !title || !badge) return;
 
       const d = new Date(dateStr + 'T00:00:00');
       title.textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
       badge.textContent = `${logs.length} ${logs.length === 1 ? 'sesión' : 'sesiones'}`;
-
       container.innerHTML = '';
 
       if (logs.length === 0) {
-        container.innerHTML = `<p class="text-[11px] text-slate-400 py-2">Sin entrenamientos registrados en esta fecha.</p>`;
+        container.innerHTML = `<p class="text-[11px] text-slate-400 py-2">Sin registros en esta fecha.</p>`;
         return;
       }
 
@@ -1162,8 +1115,14 @@
       });
     }
 
-    // Análisis de Progresión con Gemini
+    // Gemini API con gemini-1.5-flash
     window.analyzeSessionWithGemini = async function() {
+      if (!currentUser || !geminiApiKey) {
+        alert("Debes iniciar sesión con tu cuenta para usar el análisis de IA.");
+        window.toggleLoginModal();
+        return;
+      }
+
       const btn = document.getElementById('btnAnalyze');
       const session = getActiveSession();
 
@@ -1189,7 +1148,7 @@ Instrucciones:
   "suggestedWeights": { "Nombre Exacto Ejercicio": 62.5 }
 }`;
 
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
 
       try {
         const response = await fetch(apiUrl, {
@@ -1201,9 +1160,7 @@ Instrucciones:
           })
         });
 
-        if (!response.ok) {
-          throw new Error(`Error en el servicio de IA (${response.status})`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
         const result = await response.json();
         let jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -1218,7 +1175,7 @@ Instrucciones:
           window.scrollTo({ top: 120, behavior: 'smooth' });
         }
       } catch (err) {
-        console.error("Error analizando con Gemini:", err);
+        console.error("Gemini Analyze Error:", err);
         alert("No se pudo completar el análisis: " + err.message);
       } finally {
         btn.disabled = false;
@@ -1247,8 +1204,14 @@ Instrucciones:
       saveState();
     };
 
-    // Chat AI Coach
+    // Chat AI Coach con gemini-1.5-flash
     window.sendCoachQuery = async function() {
+      if (!currentUser || !geminiApiKey) {
+        alert("Debes iniciar sesión con tu cuenta para usar el Coach.");
+        window.toggleLoginModal();
+        return;
+      }
+
       const input = document.getElementById('coachPromptInput');
       const queryText = input.value.trim();
       if (!queryText) return;
@@ -1269,9 +1232,9 @@ Instrucciones:
       chatLog.appendChild(loadingBubble);
       chatLog.scrollTop = chatLog.scrollHeight;
 
-      const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){geminiApiKey}`;
+      const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){geminiApiKey}`;
       const session = getActiveSession();
-      const systemInstructionText = `Eres un entrenador personal certificado y motivador. Responde conciso a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.`;
+      const systemInstructionText = `Eres un entrenador personal certificado. Responde breve a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.`;
 
       try {
         const response = await fetch(apiUrl, {
@@ -1304,8 +1267,14 @@ Instrucciones:
       }
     };
 
+    // Service Worker PWA
     window.onload = function() {
       renderAll();
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js')
+          .then(() => console.log('Service Worker Registrado'))
+          .catch((err) => console.warn('SW Error:', err));
+      }
     };
   </script>
 </body>
