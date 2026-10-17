@@ -1238,7 +1238,7 @@ Instrucciones:
       chatLog.scrollTop = chatLog.scrollHeight;
 
       const key = String(geminiApiKey).trim();
-      const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){encodeURIComponent(key)}`;
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
       const session = getActiveSession();
       const promptText = `Eres un entrenador personal certificado. Responde breve a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.\n\nPregunta: ${queryText}`;
 
