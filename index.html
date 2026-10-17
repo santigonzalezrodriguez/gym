@@ -398,7 +398,7 @@
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Configuración pública de Firebase
+    // Configuración de Firebase del proyecto gym-tracker-b1669
     const firebaseConfig = {
       apiKey: "AIzaSyBxDsbym6-ONm-mW7Ldx3pXxmF_ZJbms5M",
       authDomain: "gym-tracker-b1669.firebaseapp.com",
@@ -411,7 +411,7 @@
 
     const appId = "fit-tracker-app";
     
-    // La clave ya no está en el código. Se lee de Firestore tras autenticarte.
+    // Clave de Gemini (se rescata de Firestore al autenticarse)
     let geminiApiKey = null;
 
     let app = null;
@@ -498,18 +498,19 @@
       renderAll();
     }
 
-    // Carga de la API Key desde Firestore (solo accesible si estás logado)
+    // Carga de la API Key desde Firestore (colección config / doc gemini)
     async function loadGeminiApiKey() {
       if (!db || !currentUser) return;
       try {
         const configDoc = await getDoc(doc(db, 'config', 'gemini'));
         if (configDoc.exists()) {
-          geminiApiKey = configDoc.data().apiKey;
+          geminiApiKey = (configDoc.data().apiKey || '').trim();
+          console.log("Gemini API Key cargada con éxito.");
         } else {
           console.warn("No se encontró el documento /config/gemini en Firestore.");
         }
       } catch (err) {
-        console.warn("Error leyendo la clave de Gemini desde Firestore:", err);
+        console.warn("Error leyendo la clave de Gemini:", err);
       }
     }
 
@@ -1115,7 +1116,7 @@
       });
     }
 
-    // Gemini API con gemini-1.5-flash
+    // Gemini API con gemini-1.5-flash y manejo robusto de errores
     window.analyzeSessionWithGemini = async function() {
       if (!currentUser || !geminiApiKey) {
         alert("Debes iniciar sesión con tu cuenta para usar el análisis de IA.");
@@ -1148,7 +1149,8 @@ Instrucciones:
   "suggestedWeights": { "Nombre Exacto Ejercicio": 62.5 }
 }`;
 
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`;
+      const key = String(geminiApiKey).trim();
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`;
 
       try {
         const response = await fetch(apiUrl, {
@@ -1160,7 +1162,10 @@ Instrucciones:
           })
         });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP ${response.status}`);
+        }
 
         const result = await response.json();
         let jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -1204,7 +1209,7 @@ Instrucciones:
       saveState();
     };
 
-    // Chat AI Coach con gemini-1.5-flash
+    // Chat AI Coach con gemini-1.5-flash y manejo robusto de errores
     window.sendCoachQuery = async function() {
       if (!currentUser || !geminiApiKey) {
         alert("Debes iniciar sesión con tu cuenta para usar el Coach.");
@@ -1232,20 +1237,24 @@ Instrucciones:
       chatLog.appendChild(loadingBubble);
       chatLog.scrollTop = chatLog.scrollHeight;
 
-      const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){geminiApiKey}`;
+      const key = String(geminiApiKey).trim();
+      const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){encodeURIComponent(key)}`;
       const session = getActiveSession();
-      const systemInstructionText = `Eres un entrenador personal certificado. Responde breve a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.`;
+      const promptText = `Eres un entrenador personal certificado. Responde breve a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.\n\nPregunta: ${queryText}`;
 
       try {
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: `${systemInstructionText}\n\nPregunta: ${queryText}` }] }]
+            contents: [{ parts: [{ text: promptText }] }]
           })
         });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP ${response.status}`);
+        }
 
         const result = await response.json();
         const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "No pude generar respuesta en este momento.";
