@@ -1116,7 +1116,7 @@
       });
     }
 
-    // Gemini API con gemini-1.5-flash y manejo robusto de errores
+    // Gemini API con gemini-1.5-flash y URL limpia
     window.analyzeSessionWithGemini = async function() {
       if (!currentUser || !geminiApiKey) {
         alert("Debes iniciar sesión con tu cuenta para usar el análisis de IA.");
@@ -1209,7 +1209,7 @@ Instrucciones:
       saveState();
     };
 
-    // Chat AI Coach con gemini-1.5-flash y manejo robusto de errores
+    // Chat AI Coach con gemini-1.5-flash y URL limpia
     window.sendCoachQuery = async function() {
       if (!currentUser || !geminiApiKey) {
         alert("Debes iniciar sesión con tu cuenta para usar el Coach.");
