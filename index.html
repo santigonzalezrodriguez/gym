@@ -619,6 +619,10 @@
     };
 
     const appId = "fit-tracker-app";
+    const GEMINI_MODEL = 'gemini-2.5-flash';
+    function geminiUrl(key) {
+      return 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
+    }
     let geminiApiKey = null;
     let app = null, auth = null, db = null, currentUser = null;
     let unsubscribeMainState = null, unsubscribeLogs = null;
@@ -1269,7 +1273,7 @@ Instrucciones:
 }`;
 
       const key = String(geminiApiKey).trim();
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(key)}`;
+      const apiUrl = geminiUrl(key);
 
       try {
         const response = await fetch(apiUrl, {
@@ -1418,7 +1422,7 @@ Instrucciones:
       const prompt = `Eres un entrenador personal certificado. Sede "${activeGymLocation}". Sesión: ${JSON.stringify(session)}. Pregunta: "${text}"`;
 
       const key = String(geminiApiKey).trim();
-      const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$){encodeURIComponent(key)}`;
+      const apiUrl = geminiUrl(key);
 
       try {
         const response = await fetch(apiUrl, {
