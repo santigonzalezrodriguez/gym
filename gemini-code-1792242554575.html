@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FitTracker AI - Entrenamientos Inteligentes</title>
+
+  <!-- PWA Capabilities -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FitTracker AI">
+  <meta name="theme-color" content="#4f46e5">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-full flex flex-col pb-16">
+
+  <!-- Header principal -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200">
+          <i class="fa-solid fa-dumbbell text-base"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-900 leading-tight">FitTracker <span class="text-indigo-600">AI</span></h1>
+          <p class="text-[10px] text-slate-500 font-medium">Tracking & Sobrecarga Inteligente</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="toggleRpeGuideModal()" title="Guía RPE" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-xl transition text-xs font-semibold flex items-center gap-1 border border-slate-200">
+          <i class="fa-solid fa-circle-info text-indigo-600"></i> <span class="hidden sm:inline">RPE</span>
+        </button>
+        <button onclick="toggleCoachModal()" title="Consultar al Entrenador IA" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1.5 rounded-xl transition text-xs font-semibold flex items-center gap-1 border border-indigo-200">
+          <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i> Coach
+        </button>
+
+        <!-- Botón de Login (Solo icono) -->
+        <button onclick="toggleLoginModal()" id="btnLoginIcon" title="Iniciar sesión" class="w-9 h-9 rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition">
+          <i id="userHeaderIcon" class="fa-solid fa-user text-sm"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto w-full px-4 pt-4 space-y-4 flex-1">
+
+    <!-- Selector de Sesiones -->
+    <section class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-calendar-week text-indigo-600 text-sm"></i>
+          <h2 class="text-sm font-bold text-slate-800">Tus Sesiones</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="toggleHistoryModal()" class="text-xs font-semibold text-slate-600 hover:text-indigo-600 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition">
+            <i class="fa-solid fa-clock-rotate-left text-[11px]"></i> Histórico
+          </button>
+          <button onclick="openNewSessionModal()" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+            <i class="fa-solid fa-plus text-[10px]"></i> Nueva
+          </button>
+        </div>
+      </div>
+
+      <!-- Badges de Sesión -->
+      <div id="sessionTabs" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"></div>
+    </section>
+
+    <!-- Resumen de Sesión Activa -->
+    <section class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl px-3.5 py-2.5 shadow-md shadow-indigo-100/50 flex items-center justify-between gap-3">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] bg-white/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider text-indigo-100">Sesión Activa</span>
+          <span id="lastCompletedDateText" class="text-[10px] text-indigo-200 truncate"></span>
+        </div>
+        <h3 id="activeSessionTitle" class="text-sm font-bold truncate">Cargando...</h3>
+      </div>
+
+      <div class="flex items-center gap-3 shrink-0">
+        <div class="text-right">
+          <div id="activeSessionVolume" class="text-xs font-bold">0 kg</div>
+          <div id="sessionProgressText" class="text-[10px] text-indigo-200">0% hecho</div>
+        </div>
+        <div class="w-10 h-10 relative flex items-center justify-center">
+          <svg class="w-9 h-9 transform -rotate-90">
+            <circle cx="18" cy="18" r="14" stroke="currentColor" stroke-width="3" class="text-indigo-800/40" fill="transparent"/>
+            <circle id="sessionProgressCircle" cx="18" cy="18" r="14" stroke="currentColor" stroke-width="3" class="text-white transition-all duration-300" stroke-dasharray="88" stroke-dashoffset="88" fill="transparent"/>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <!-- Recomendación de Sobrecarga Progresiva Gemini -->
+    <div id="aiSuggestionBox" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs space-y-2">
+      <div class="font-bold text-amber-900 flex items-center gap-1.5">
+        <i class="fa-solid fa-bolt text-amber-600"></i>
+        <span>Sugerencia de Sobrecarga Progresiva (IA)</span>
+      </div>
+      <p id="aiSuggestionText" class="text-slate-700 leading-relaxed"></p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button onclick="dismissAiSuggestion()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-medium text-[11px]">Descartar</button>
+        <button onclick="applySuggestedWeights()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-[11px] shadow-sm">Aplicar Nuevas Cargas</button>
+      </div>
+    </div>
+
+    <!-- Lista de Ejercicios -->
+    <section class="space-y-3">
+      <div class="flex justify-between items-center px-1">
+        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <span>Ejercicios Planificados</span>
+          <span id="exerciseCountBadge" class="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold">0</span>
+        </h3>
+        <div class="flex items-center gap-2">
+          <button onclick="completeCurrentWorkoutSession()" id="btnFinishSession" title="Guardar registro en el historial" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5 shrink-0">
+            <i class="fa-solid fa-floppy-disk text-[11px]"></i> Guardar
+          </button>
+          <button onclick="openAddExerciseModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition flex items-center gap-1.5 shrink-0">
+            <i class="fa-solid fa-plus text-[10px]"></i> Añadir
+          </button>
+        </div>
+      </div>
+
+      <div id="exerciseList" class="space-y-2"></div>
+    </section>
+
+    <!-- Botón de Análisis General con Gemini -->
+    <section class="pt-2">
+      <button onclick="analyzeSessionWithGemini()" id="btnAnalyze" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-xs">
+        <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+        <span>Analizar Progresión & Ajustar Cargas (IA)</span>
+      </button>
+    </section>
+
+  </main>
+
+  <!-- Modal Iniciar Sesión (Sin registro) -->
+  <div id="loginModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <i class="fa-solid fa-user-lock text-xs"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-900">Acceso Usuario</h3>
+        </div>
+        <button onclick="toggleLoginModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="loggedOutContent" class="space-y-3">
+        <p class="text-xs text-slate-500">Inicia sesión con tu cuenta para sincronizar tus rutinas en la nube con Firestore.</p>
+
+        <div id="authErrorMessage" class="hidden text-[11px] bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl leading-relaxed"></div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Correo electrónico</label>
+          <input type="email" id="loginEmail" placeholder="usuario@email.com" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+            onkeydown="if(event.key==='Enter') performLogin()">
+        </div>
+
+        <div class="pt-2">
+          <button onclick="performLogin()" id="btnLoginSubmit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
+            <span>Iniciar Sesión</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="loggedInContent" class="hidden space-y-3 text-xs">
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 space-y-1">
+          <div class="font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>Sesión iniciada con éxito</span>
+          </div>
+          <div id="userEmailDisplay" class="font-mono text-[11px] text-slate-600 truncate"></div>
+        </div>
+        <p class="text-slate-500 text-[11px]">Tus rutinas y registros se están sincronizando automáticamente con Firestore en la nube.</p>
+        <div class="pt-2">
+          <button onclick="performLogout()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2 rounded-xl text-xs font-bold transition">
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Añadir / Editar Ejercicio -->
+  <div id="exerciseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 id="exerciseModalTitle" class="text-base font-bold text-slate-900">Añadir Ejercicio</h3>
+        <button onclick="closeExerciseModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="exerciseForm" class="space-y-3">
+        <input type="hidden" id="editExerciseIndex" value="-1">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre del Ejercicio</label>
+          <input type="text" id="modalExName" placeholder="Ej. Press de Banca, Dominadas..." required
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
+        </div>
+
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Series</label>
+            <input type="number" id="modalExSets" placeholder="3" min="1" required
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Reps Meta</label>
+            <input type="number" id="modalExReps" placeholder="10" min="1" required
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Peso (kg)</label>
+            <input type="number" step="0.5" id="modalExWeight" placeholder="60" required
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Tempo (Opcional)</label>
+          <input type="text" id="modalExTempo" placeholder="Ej. 3-1-1-0" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
+          <span class="text-[10px] text-slate-400">Excéntrica - Pausa abajo - Concéntrica - Pausa arriba</span>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" onclick="closeExerciseModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Nueva Sesión -->
+  <div id="newSessionModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900">Crear Nueva Sesión</h3>
+        <button onclick="closeNewSessionModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Sesión</label>
+          <input type="text" id="newSessionNameInput" placeholder="Ej. Sesión 4: Torso Fuerza..." 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeNewSessionModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
+        <button onclick="createNewSession()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Crear Sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Guía RPE -->
+  <div id="rpeGuideModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-indigo-600"></i>
+          <h3 class="text-base font-bold text-slate-900">Guía de Escala RPE</h3>
+        </div>
+        <button onclick="toggleRpeGuideModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-600 leading-relaxed max-h-[70vh] overflow-y-auto pr-1">
+        <p>El <strong>RPE (Rating of Perceived Exertion)</strong> mide la intensidad del esfuerzo en función de las repeticiones en recámara (RIR):</p>
+        <div class="space-y-2">
+          <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <span class="font-bold text-emerald-800">RPE 6 - 7 (Ligero):</span>
+            <p class="text-[11px] text-emerald-700">Podías hacer 3 a 4 repeticiones más antes de fallar. Carga manejable.</p>
+          </div>
+          <div class="p-2.5 bg-indigo-50 border border-indigo-200 rounded-xl">
+            <span class="font-bold text-indigo-800">RPE 8 (Punto Óptimo Hipertrofia):</span>
+            <p class="text-[11px] text-indigo-700">Te quedaban 2 repeticiones en recámara. Máximo estímulo con fatiga controlada.</p>
+          </div>
+          <div class="p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+            <span class="font-bold text-amber-800">RPE 9 (Muy Pesado):</span>
+            <p class="text-[11px] text-amber-700">Solo 1 repetición en recámara. Esfuerzo máximo con técnica correcta.</p>
+          </div>
+          <div class="p-2.5 bg-rose-50 border border-rose-200 rounded-xl">
+            <span class="font-bold text-rose-800">RPE 10 (Fallo Técnico/Total):</span>
+            <p class="text-[11px] text-rose-700">0 repeticiones restantes. Mantener o consolidar la carga.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-slate-100">
+        <button onclick="toggleRpeGuideModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Histórico con Calendario -->
+  <div id="historyModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-calendar-days text-indigo-600"></i>
+          <h3 class="text-base font-bold text-slate-900">Histórico de Sesiones</h3>
+        </div>
+        <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 flex-1 overflow-y-auto pr-1">
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-2">
+          <div class="flex justify-between items-center px-1">
+            <button onclick="changeCalendarMonth(-1)" class="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-200 rounded-lg transition">
+              <i class="fa-solid fa-chevron-left text-xs"></i>
+            </button>
+            <span id="calendarMonthLabel" class="text-xs font-bold text-slate-800 capitalize"></span>
+            <button onclick="changeCalendarMonth(1)" class="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-slate-200 rounded-lg transition">
+              <i class="fa-solid fa-chevron-right text-xs"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase pt-1">
+            <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+          </div>
+
+          <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-xs"></div>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <div class="flex justify-between items-center">
+            <span id="selectedDateTitle" class="text-xs font-bold text-slate-800"></span>
+            <span id="selectedDateBadge" class="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold border border-indigo-100"></span>
+          </div>
+          <div id="dayLogsContainer" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Coach IA Chat -->
+  <div id="coachModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl h-[80vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">AI Coach Personal</h3>
+            <p class="text-[10px] text-slate-500">Consulta sustitutos, técnica y dudas de tu rutina</p>
+          </div>
+        </div>
+        <button onclick="toggleCoachModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="coachChatLog" class="flex-1 overflow-y-auto space-y-3 p-1 text-xs">
+        <div class="bg-indigo-50 border border-indigo-100 text-indigo-900 p-3 rounded-2xl leading-relaxed">
+          👋 ¡Hola! Soy tu asistente de entrenamiento. Pregúntame sobre sustitutos de ejercicios, descansos o dudas con el RPE.
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex gap-2 shrink-0">
+        <input type="text" id="coachPromptInput" placeholder="Ej. ¿Cómo puedo calentar antes de hacer sentadilla?" 
+          class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+          onkeydown="if(event.key==='Enter') sendCoachQuery()">
+        <button onclick="sendCoachQuery()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmación Borrado Ejercicio -->
+  <div id="deleteConfirmModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-xs space-y-4 shadow-2xl text-center">
+      <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-900">¿Eliminar ejercicio?</h3>
+        <p class="text-xs text-slate-500 mt-1">Se quitará de la sesión activa.</p>
+      </div>
+      <div class="flex justify-center gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeDeleteConfirmModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition flex-1">Cancelar</button>
+        <button onclick="confirmDeleteExercise()" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition flex-1">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Script Principal con Firebase Modular y Gemini -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Credenciales con la clave corregida (ZJbms5M)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBxDsbym6-ONm-mW7Ldx3pXxmF_ZJbms5M",
+      authDomain: "gym-tracker-b1669.firebaseapp.com",
+      projectId: "gym-tracker-b1669",
+      storageBucket: "gym-tracker-b1669.firebasestorage.app",
+      messagingSenderId: "213811562088",
+      appId: "1:213811562088:web:eb0171e3d581295a125ddd",
+      measurementId: "G-2Q9Z54425P"
+    };
+
+    const appId = "fit-tracker-app";
+    const geminiApiKey = "AIzaSyB3Zkw1ubXzz9j9SqSQpeaBlWdTJ6hSvHE";
+
+    let app = null;
+    let auth = null;
+    let db = null;
+    let currentUser = null;
+    let unsubscribeSnapshot = null;
+
+    let workoutSessions = JSON.parse(localStorage.getItem('fit_sessions')) || [
+      {
+        id: "sess_empuje",
+        name: "Día 1: Empuje (Push)",
+        lastCompleted: null,
+        exercises: [
+          { name: "Press de Banca Plano", sets: 4, reps: 8, weight: 60, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Press Inclinado con Mancuernas", sets: 3, reps: 10, weight: 22, tempo: "2-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Press Militar con Barra", sets: 3, reps: 8, weight: 40, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Elevaciones Laterales", sets: 4, reps: 12, weight: 10, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "9", notes: "" },
+          { name: "Fondos en Paralelas", sets: 3, reps: 10, weight: 0, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" }
+        ]
+      },
+      {
+        id: "sess_traccion",
+        name: "Día 2: Tracción (Pull)",
+        lastCompleted: null,
+        exercises: [
+          { name: "Dominadas Pronas", sets: 4, reps: 8, weight: 0, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Remo con Barra", sets: 3, reps: 10, weight: 50, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Remo Gironda", sets: 3, reps: 12, weight: 45, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Face Pulls con Polea", sets: 4, reps: 15, weight: 20, tempo: "2-0-1-1", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Curl de Bíceps con Barra Z", sets: 3, reps: 10, weight: 25, tempo: "3-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" }
+        ]
+      },
+      {
+        id: "sess_pierna",
+        name: "Día 3: Pierna & Core (Legs)",
+        lastCompleted: null,
+        exercises: [
+          { name: "Sentadilla Trasera con Barra", sets: 4, reps: 8, weight: 70, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Peso Muerto Rumano (RDL)", sets: 4, reps: 10, weight: 65, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Prensa de Piernas 45°", sets: 3, reps: 12, weight: 120, tempo: "2-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+          { name: "Elevación de Gemelos", sets: 4, reps: 15, weight: 40, tempo: "2-2-1-0", status: "pending", sensation: "Adecuada", rpe: "9", notes: "" },
+          { name: "Plancha Abdominal", sets: 3, reps: 60, weight: 0, tempo: "", status: "pending", sensation: "Adecuada", rpe: "8", notes: "60 segundos" }
+        ]
+      }
+    ];
+
+    let workoutLogs = JSON.parse(localStorage.getItem('fit_logs')) || [];
+    let activeSessionIndex = 0;
+    let pendingSuggestedWeights = null;
+    let openFeedbackIndex = null;
+    let exerciseToDeleteIndex = null;
+
+    let currentCalendarDate = new Date();
+    let selectedCalendarDateStr = new Date().toISOString().slice(0, 10);
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+
+      onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        updateAuthUI(user);
+        if (user) {
+          attachFirestoreListener(user.uid);
+        } else {
+          if (unsubscribeSnapshot) {
+            unsubscribeSnapshot();
+            unsubscribeSnapshot = null;
+          }
+          renderAll();
+        }
+      });
+    } catch (e) {
+      console.error("Error al inicializar Firebase:", e);
+      renderAll();
+    }
+
+    function updateAuthUI(user) {
+      const btn = document.getElementById('btnLoginIcon');
+      const icon = document.getElementById('userHeaderIcon');
+      const loggedInContent = document.getElementById('loggedInContent');
+      const loggedOutContent = document.getElementById('loggedOutContent');
+      const userEmailDisplay = document.getElementById('userEmailDisplay');
+      const errBox = document.getElementById('authErrorMessage');
+
+      if (errBox) errBox.classList.add('hidden');
+
+      if (user) {
+        if (btn) {
+          btn.classList.remove('bg-slate-100', 'text-slate-700');
+          btn.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-300');
+        }
+        if (icon) icon.className = "fa-solid fa-user-check text-sm";
+        if (loggedInContent) loggedInContent.classList.remove('hidden');
+        if (loggedOutContent) loggedOutContent.classList.add('hidden');
+        if (userEmailDisplay) userEmailDisplay.textContent = user.email || user.uid;
+      } else {
+        if (btn) {
+          btn.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-300');
+          btn.classList.add('bg-slate-100', 'text-slate-700');
+        }
+        if (icon) icon.className = "fa-solid fa-user text-sm";
+        if (loggedInContent) loggedInContent.classList.add('hidden');
+        if (loggedOutContent) loggedOutContent.classList.remove('hidden');
+      }
+    }
+
+    function attachFirestoreListener(userId) {
+      if (!db || !userId) return;
+
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+      }
+
+      const docRef = doc(db, 'artifacts', appId, 'users', userId, 'userWorkouts', 'mainState');
+      
+      unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
+            workoutSessions = data.sessions;
+          }
+          if (data.logs && Array.isArray(data.logs)) {
+            workoutLogs = data.logs;
+          }
+          localStorage.setItem('fit_sessions', JSON.stringify(workoutSessions));
+          localStorage.setItem('fit_logs', JSON.stringify(workoutLogs));
+          renderAll();
+        } else {
+          saveState();
+        }
+      }, (err) => {
+        console.warn("Aviso Firestore onSnapshot:", err);
+      });
+    }
+
+    function saveState() {
+      localStorage.setItem('fit_sessions', JSON.stringify(workoutSessions));
+      localStorage.setItem('fit_logs', JSON.stringify(workoutLogs));
+
+      if (db && currentUser) {
+        const docRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'userWorkouts', 'mainState');
+        setDoc(docRef, {
+          sessions: workoutSessions,
+          logs: workoutLogs,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(err => {
+          console.error("Error guardando en Firestore:", err);
+        });
+      }
+      renderAll();
+    }
+
+    function getActiveSession() {
+      if (!workoutSessions || workoutSessions.length === 0) {
+        workoutSessions = [{ id: "sess_default", name: "Sesión 1", exercises: [] }];
+      }
+      return workoutSessions[activeSessionIndex] || workoutSessions[0];
+    }
+
+    function renderAll() {
+      renderSessionTabs();
+      renderActiveSession();
+    }
+
+    function renderSessionTabs() {
+      const tabs = document.getElementById('sessionTabs');
+      if (!tabs) return;
+      tabs.innerHTML = '';
+
+      if (activeSessionIndex >= workoutSessions.length) {
+        activeSessionIndex = 0;
+      }
+
+      workoutSessions.forEach((sess, idx) => {
+        const isActive = idx === activeSessionIndex;
+        const btn = document.createElement('button');
+        btn.className = `px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+          isActive 
+            ? 'bg-indigo-600 text-white shadow-sm' 
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+        }`;
+        btn.innerHTML = `<span>${escapeHtml(sess.name)}</span>`;
+        btn.onclick = () => {
+          activeSessionIndex = idx;
+          openFeedbackIndex = null;
+          renderAll();
+        };
+        tabs.appendChild(btn);
+      });
+    }
+
+    function renderActiveSession() {
+      const session = getActiveSession();
+      if (!session) return;
+
+      const titleEl = document.getElementById('activeSessionTitle');
+      if (titleEl) titleEl.textContent = session.name || "Sesión de Entrenamiento";
+
+      const dateText = document.getElementById('lastCompletedDateText');
+      if (dateText) {
+        if (session.lastCompleted) {
+          const d = new Date(session.lastCompleted);
+          dateText.textContent = `• Última: ${d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}`;
+        } else {
+          dateText.textContent = '• Sin completar aún';
+        }
+      }
+
+      let totalVolume = 0;
+      let completedCount = 0;
+
+      if (!session.exercises) session.exercises = [];
+
+      session.exercises.forEach(ex => {
+        if (ex.status === 'completed') {
+          totalVolume += (ex.sets * ex.reps * (ex.weight || 0));
+          completedCount++;
+        }
+      });
+
+      const volEl = document.getElementById('activeSessionVolume');
+      if (volEl) volEl.textContent = `${totalVolume.toLocaleString()} kg total`;
+      
+      const totalExercises = session.exercises.length;
+      const progressPercent = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
+      
+      const progEl = document.getElementById('sessionProgressText');
+      if (progEl) progEl.textContent = `${progressPercent}% hecho`;
+
+      const circle = document.getElementById('sessionProgressCircle');
+      if (circle) {
+        const dashOffset = 88 - (88 * progressPercent / 100);
+        circle.style.strokeDashoffset = dashOffset;
+      }
+
+      const badgeEl = document.getElementById('exerciseCountBadge');
+      if (badgeEl) badgeEl.textContent = totalExercises;
+
+      const list = document.getElementById('exerciseList');
+      if (!list) return;
+      list.innerHTML = '';
+
+      if (totalExercises === 0) {
+        list.innerHTML = `<div class="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400">
+          No hay ejercicios en esta sesión. Pulsa "+ Añadir" para crear uno.
+        </div>`;
+        return;
+      }
+
+      session.exercises.forEach((ex, idx) => {
+        const isCompleted = ex.status === 'completed';
+        const isSkipped = ex.status === 'skipped';
+        const isFeedbackOpen = openFeedbackIndex === idx;
+
+        const item = document.createElement('div');
+        item.className = `bg-white border rounded-xl transition shadow-sm overflow-hidden ${
+          isCompleted 
+            ? 'border-emerald-300 bg-emerald-50/20' 
+            : isSkipped 
+              ? 'border-rose-300 bg-rose-50/40' 
+              : 'border-slate-200'
+        }`;
+
+        item.innerHTML = `
+          <div class="p-3 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 flex-1 min-w-0">
+              <button onclick="window.toggleExerciseStatus(${idx})" title="Hecho / Omitido / Pendiente" 
+                class="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition border ${
+                  isCompleted 
+                    ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' 
+                    : isSkipped 
+                      ? 'bg-rose-500 border-rose-600 text-white shadow-sm' 
+                      : 'bg-slate-100 border-slate-300 text-slate-400 hover:border-slate-400'
+                }">
+                <i class="fa-solid ${isCompleted ? 'fa-check' : isSkipped ? 'fa-xmark' : 'fa-circle'} text-xs"></i>
+              </button>
+
+              <div class="min-w-0 flex-1">
+                <div class="font-bold text-slate-800 text-xs truncate ${isSkipped ? 'line-through text-rose-700/70' : ''}">${escapeHtml(ex.name)}</div>
+                
+                <div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+                  <span class="font-semibold text-slate-700">${ex.sets}×${ex.reps}</span>
+                  <span class="text-slate-300">•</span>
+                  <span class="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 text-[10px]">${ex.weight} kg</span>
+                  ${ex.tempo ? `<span class="bg-violet-50 text-violet-700 border border-violet-100 px-1 py-0.2 rounded text-[9px] font-medium"><i class="fa-solid fa-stopwatch text-[8px] mr-0.5"></i>${escapeHtml(ex.tempo)}</span>` : ''}
+                  ${ex.rpe ? `<span class="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-medium border border-slate-200">RPE ${ex.rpe}</span>` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="window.toggleExerciseFeedbackPanel(${idx})" title="Feedback" class="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center">
+                <i class="fa-solid fa-sliders"></i>
+              </button>
+              <button onclick="window.openEditExerciseModal(${idx})" title="Editar" class="text-slate-400 hover:text-slate-700 w-7 h-7 rounded-lg transition flex items-center justify-center">
+                <i class="fa-solid fa-pen-to-square text-xs"></i>
+              </button>
+              <button onclick="window.promptDeleteExercise(${idx})" title="Eliminar" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition flex items-center justify-center">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+              </button>
+            </div>
+          </div>
+
+          ${isFeedbackOpen ? `
+            <div class="bg-slate-50 border-t border-slate-200 p-3 space-y-2.5 text-xs">
+              <div class="font-bold text-slate-700 flex justify-between items-center text-[11px]">
+                <span><i class="fa-solid fa-clipboard-check text-indigo-600 mr-1"></i> Feedback de ${escapeHtml(ex.name)}</span>
+                <button onclick="window.toggleExerciseFeedbackPanel(${idx})" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Estado</label>
+                  <select id="exStatus_${idx}" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+                    <option value="completed" ${ex.status === 'completed' ? 'selected' : ''}>✅ Realizado</option>
+                    <option value="skipped" ${ex.status === 'skipped' ? 'selected' : ''}>❌ Omitido</option>
+                    <option value="pending" ${ex.status === 'pending' ? 'selected' : ''}>⏳ Pendiente</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Sensación</label>
+                  <select id="exSensation_${idx}" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+                    <option value="Ligera" ${ex.sensation === 'Ligera' ? 'selected' : ''}>🟢 Ligera (+ Carga)</option>
+                    <option value="Adecuada" ${(!ex.sensation || ex.sensation === 'Adecuada') ? 'selected' : ''}>🔵 Adecuada (Óptimo)</option>
+                    <option value="Muy Pesada" ${ex.sensation === 'Muy Pesada' ? 'selected' : ''}>🟡 Muy Pesada (Mantener)</option>
+                    <option value="Fallo" ${ex.sensation === 'Fallo' ? 'selected' : ''}>🔴 Fallo (Descargar)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Escala RPE</label>
+                  <select id="exRPE_${idx}" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+                    <option value="6-7" ${ex.rpe === '6-7' ? 'selected' : ''}>RPE 6-7 (+3-4 reps)</option>
+                    <option value="8" ${(!ex.rpe || ex.rpe === '8') ? 'selected' : ''}>RPE 8 (2 reps recámara)</option>
+                    <option value="9" ${ex.rpe === '9' ? 'selected' : ''}>RPE 9 (1 rep recámara)</option>
+                    <option value="10" ${ex.rpe === '10' ? 'selected' : ''}>RPE 10 (Fallo máximo)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Notas técnicas</label>
+                <input type="text" id="exNotes_${idx}" value="${escapeHtml(ex.notes || '')}" placeholder="Ej. Buena técnica, subir 2.5kg..." 
+                  class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+              </div>
+
+              <div class="flex justify-end pt-0.5">
+                <button onclick="window.saveIndividualFeedback(${idx})" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1 rounded-lg text-xs shadow-sm transition">
+                  Guardar Feedback
+                </button>
+              </div>
+            </div>
+          ` : ''}
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    // Funciones del Modal de Autenticación
+    window.toggleLoginModal = function() {
+      const modal = document.getElementById('loginModal');
+      if (modal) modal.classList.toggle('hidden');
+    };
+
+    window.performLogin = async function() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errBox = document.getElementById('authErrorMessage');
+      const btn = document.getElementById('btnLoginSubmit');
+
+      errBox.classList.add('hidden');
+      errBox.textContent = '';
+
+      if (!email || !password) {
+        errBox.textContent = "Introduce tu correo y contraseña.";
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Conectando...`;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        document.getElementById('loginPassword').value = '';
+        setTimeout(() => {
+          window.toggleLoginModal();
+        }, 500);
+      } catch (err) {
+        console.error("Error al iniciar sesión:", err);
+        let msg = `Error (${err.code}): ${err.message}`;
+        if (err.code === 'auth/operation-not-allowed') {
+          msg = "El proveedor de Email/Password no está habilitado en tu consola de Firebase.";
+        } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+          msg = "Credenciales incorrectas. Verifica tu email y contraseña.";
+        } else if (err.code === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.') {
+          msg = "API Key no válida. Revisa los permisos y restricciones en Google Cloud.";
+        }
+        errBox.textContent = msg;
+        errBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Iniciar Sesión</span>`;
+      }
+    };
+
+    window.performLogout = async function() {
+      try {
+        await signOut(auth);
+        window.toggleLoginModal();
+      } catch (err) {
+        alert("Error al cerrar sesión: " + err.message);
+      }
+    };
+
+    window.toggleRpeGuideModal = function() {
+      const modal = document.getElementById('rpeGuideModal');
+      if (modal) modal.classList.toggle('hidden');
+    };
+
+    window.toggleCoachModal = function() {
+      const modal = document.getElementById('coachModal');
+      if (modal) modal.classList.toggle('hidden');
+    };
+
+    window.openNewSessionModal = function() {
+      document.getElementById('newSessionNameInput').value = '';
+      document.getElementById('newSessionModal').classList.remove('hidden');
+    };
+
+    window.closeNewSessionModal = function() {
+      document.getElementById('newSessionModal').classList.add('hidden');
+    };
+
+    window.createNewSession = function() {
+      const nameInput = document.getElementById('newSessionNameInput').value.trim();
+      if (!nameInput) {
+        alert("Escribe un nombre para la sesión.");
+        return;
+      }
+
+      const newSess = {
+        id: "sess_" + Date.now(),
+        name: nameInput,
+        lastCompleted: null,
+        exercises: []
+      };
+
+      workoutSessions.push(newSess);
+      activeSessionIndex = workoutSessions.length - 1;
+      closeNewSessionModal();
+      saveState();
+    };
+
+    window.openAddExerciseModal = function() {
+      document.getElementById('exerciseModalTitle').textContent = 'Añadir Ejercicio';
+      document.getElementById('editExerciseIndex').value = '-1';
+      document.getElementById('modalExName').value = '';
+      document.getElementById('modalExSets').value = '3';
+      document.getElementById('modalExReps').value = '10';
+      document.getElementById('modalExWeight').value = '0';
+      document.getElementById('modalExTempo').value = '';
+      document.getElementById('exerciseModal').classList.remove('hidden');
+    };
+
+    window.toggleExerciseStatus = function(index) {
+      const session = getActiveSession();
+      if (!session) return;
+      const current = session.exercises[index].status;
+      if (current === 'pending') session.exercises[index].status = 'completed';
+      else if (current === 'completed') session.exercises[index].status = 'skipped';
+      else session.exercises[index].status = 'pending';
+      saveState();
+    };
+
+    window.toggleExerciseFeedbackPanel = function(idx) {
+      openFeedbackIndex = openFeedbackIndex === idx ? null : idx;
+      renderActiveSession();
+    };
+
+    window.saveIndividualFeedback = function(idx) {
+      const session = getActiveSession();
+      if (!session || !session.exercises[idx]) return;
+
+      session.exercises[idx].status = document.getElementById(`exStatus_${idx}`).value;
+      session.exercises[idx].sensation = document.getElementById(`exSensation_${idx}`).value;
+      session.exercises[idx].rpe = document.getElementById(`exRPE_${idx}`).value;
+      session.exercises[idx].notes = document.getElementById(`exNotes_${idx}`).value.trim();
+
+      openFeedbackIndex = null;
+      saveState();
+    };
+
+    window.promptDeleteExercise = function(index) {
+      exerciseToDeleteIndex = index;
+      const modal = document.getElementById('deleteConfirmModal');
+      if (modal) modal.classList.remove('hidden');
+    };
+
+    window.closeDeleteConfirmModal = function() {
+      exerciseToDeleteIndex = null;
+      const modal = document.getElementById('deleteConfirmModal');
+      if (modal) modal.classList.add('hidden');
+    };
+
+    window.confirmDeleteExercise = function() {
+      if (exerciseToDeleteIndex === null) return;
+      const session = getActiveSession();
+      if (session) {
+        session.exercises.splice(exerciseToDeleteIndex, 1);
+        openFeedbackIndex = null;
+        saveState();
+      }
+      closeDeleteConfirmModal();
+    };
+
+    window.openEditExerciseModal = function(idx) {
+      const session = getActiveSession();
+      if (!session || !session.exercises[idx]) return;
+      const ex = session.exercises[idx];
+
+      document.getElementById('exerciseModalTitle').textContent = 'Editar Ejercicio';
+      document.getElementById('editExerciseIndex').value = idx;
+      document.getElementById('modalExName').value = ex.name;
+      document.getElementById('modalExSets').value = ex.sets;
+      document.getElementById('modalExReps').value = ex.reps;
+      document.getElementById('modalExWeight').value = ex.weight;
+      document.getElementById('modalExTempo').value = ex.tempo || '';
+      document.getElementById('exerciseModal').classList.remove('hidden');
+    };
+
+    window.closeExerciseModal = function() {
+      document.getElementById('exerciseModal').classList.add('hidden');
+    };
+
+    document.getElementById('exerciseForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const session = getActiveSession();
+      if (!session) return;
+
+      const idx = parseInt(document.getElementById('editExerciseIndex').value);
+      const name = document.getElementById('modalExName').value.trim();
+      const sets = parseInt(document.getElementById('modalExSets').value);
+      const reps = parseInt(document.getElementById('modalExReps').value);
+      const weight = parseFloat(document.getElementById('modalExWeight').value) || 0;
+      const tempo = document.getElementById('modalExTempo').value.trim();
+
+      if (idx === -1) {
+        session.exercises.push({
+          name, sets, reps, weight, tempo,
+          status: 'pending',
+          sensation: 'Adecuada',
+          rpe: '8',
+          notes: ''
+        });
+      } else {
+        session.exercises[idx].name = name;
+        session.exercises[idx].sets = sets;
+        session.exercises[idx].reps = reps;
+        session.exercises[idx].weight = weight;
+        session.exercises[idx].tempo = tempo;
+      }
+
+      closeExerciseModal();
+      saveState();
+    });
+
+    window.completeCurrentWorkoutSession = function() {
+      const session = getActiveSession();
+      if (!session) return;
+
+      const completedCount = session.exercises.filter(e => e.status === 'completed').length;
+      if (completedCount === 0) {
+        alert("Marca al menos un ejercicio como realizado antes de guardar.");
+        return;
+      }
+
+      const now = new Date();
+      session.lastCompleted = now.toISOString();
+
+      workoutLogs.unshift({
+        id: "log_" + Date.now(),
+        sessionName: session.name,
+        date: now.toISOString(),
+        exercisesCount: session.exercises.length,
+        completedCount: completedCount,
+        volume: session.exercises.reduce((acc, ex) => ex.status === 'completed' ? acc + (ex.sets * ex.reps * (ex.weight || 0)) : acc, 0),
+        exercisesDetail: session.exercises.map(e => ({ ...e }))
+      });
+
+      session.exercises.forEach(ex => { ex.status = 'pending'; });
+
+      saveState();
+      alert("¡Entrenamiento guardado con éxito en tu historial!");
+    };
+
+    window.toggleHistoryModal = function() {
+      const modal = document.getElementById('historyModal');
+      if (!modal) return;
+      const isHidden = modal.classList.contains('hidden');
+      if (isHidden) {
+        renderCalendar();
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    };
+
+    window.changeCalendarMonth = function(delta) {
+      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+      renderCalendar();
+    };
+
+    function renderCalendar() {
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+
+      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      document.getElementById('calendarMonthLabel').textContent = `${monthNames[month]} ${year}`;
+
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+
+      const logsByDate = {};
+      workoutLogs.forEach(log => {
+        const dateKey = log.date.slice(0, 10);
+        if (!logsByDate[dateKey]) logsByDate[dateKey] = [];
+        logsByDate[dateKey].push(log);
+      });
+
+      const firstDayOfMonth = new Date(year, month, 1);
+      let startingDay = firstDayOfMonth.getDay() - 1;
+      if (startingDay === -1) startingDay = 6;
+
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < startingDay; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = "h-8 rounded-lg bg-transparent";
+        grid.appendChild(emptyCell);
+      }
+
+      const todayStr = new Date().toISOString().slice(0, 10);
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateObj = new Date(year, month, day);
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        const hasLogs = !!logsByDate[dateStr];
+        const isSelected = selectedCalendarDateStr === dateStr;
+        const isToday = todayStr === dateStr;
+
+        const cell = document.createElement('button');
+        cell.className = `h-8 text-xs font-semibold rounded-xl flex flex-col items-center justify-center relative transition ${
+          isSelected 
+            ? 'bg-indigo-600 text-white shadow-md' 
+            : isToday 
+              ? 'bg-indigo-100 text-indigo-700 font-bold border border-indigo-200' 
+              : 'hover:bg-slate-100 text-slate-700'
+        }`;
+
+        cell.onclick = () => {
+          selectedCalendarDateStr = dateStr;
+          renderCalendar();
+        };
+
+        cell.innerHTML = `<span>${day}</span>`;
+
+        if (hasLogs) {
+          const dot = document.createElement('span');
+          dot.className = `w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-amber-300' : 'bg-indigo-600'}`;
+          cell.appendChild(dot);
+        }
+
+        grid.appendChild(cell);
+      }
+
+      renderDayLogs(selectedCalendarDateStr, logsByDate[selectedCalendarDateStr] || []);
+    }
+
+    function renderDayLogs(dateStr, logs) {
+      const container = document.getElementById('dayLogsContainer');
+      const title = document.getElementById('selectedDateTitle');
+      const badge = document.getElementById('selectedDateBadge');
+
+      if (!container || !title || !badge) return;
+
+      const d = new Date(dateStr + 'T00:00:00');
+      title.textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+      badge.textContent = `${logs.length} ${logs.length === 1 ? 'sesión' : 'sesiones'}`;
+
+      container.innerHTML = '';
+
+      if (logs.length === 0) {
+        container.innerHTML = `<p class="text-[11px] text-slate-400 py-2">Sin entrenamientos registrados en esta fecha.</p>`;
+        return;
+      }
+
+      logs.forEach(log => {
+        const item = document.createElement('div');
+        item.className = "p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs";
+        item.innerHTML = `
+          <div class="flex justify-between font-bold text-slate-800">
+            <span>${escapeHtml(log.sessionName)}</span>
+            <span class="text-indigo-600">${log.volume.toLocaleString()} kg</span>
+          </div>
+          <div class="text-[10px] text-slate-500 flex items-center gap-2">
+            <span>${log.completedCount}/${log.exercisesCount} ejercicios</span>
+            <span>•</span>
+            <span>${new Date(log.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // Análisis de Progresión con Gemini
+    window.analyzeSessionWithGemini = async function() {
+      const btn = document.getElementById('btnAnalyze');
+      const session = getActiveSession();
+
+      if (!session || session.exercises.length === 0) {
+        alert("Añade primero ejercicios a la sesión actual.");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analizando con Gemini...`;
+
+      const prompt = `Analiza el feedback de mi sesión de entrenamiento e indica ajustes de carga para la próxima sesión en kg.
+Sesión: "${session.name}"
+Ejercicios completados/pendientes: ${JSON.stringify(session.exercises)}
+
+Instrucciones:
+1. Si un ejercicio fue Omitido/skipped, no subas peso.
+2. Si la sensación fue 'Ligera' o RPE 6-7, propone una subida moderada (+1kg a +5kg según ejercicio).
+3. Si la sensación fue 'Muy Pesada' o RPE 10, mantén o reduce ligeramente la carga.
+4. Devuelve ÚNICAMENTE un objeto JSON válido con este formato:
+{
+  "explanation": "resumen breve y motivador de los ajustes sugeridos",
+  "suggestedWeights": { "Nombre Exacto Ejercicio": 62.5 }
+}`;
+
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error en el servicio de IA (${response.status})`);
+        }
+
+        const result = await response.json();
+        let jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (jsonText) {
+          jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+          const parsed = JSON.parse(jsonText);
+          pendingSuggestedWeights = parsed.suggestedWeights || {};
+
+          document.getElementById('aiSuggestionText').textContent = parsed.explanation || "Análisis completado.";
+          document.getElementById('aiSuggestionBox').classList.remove('hidden');
+          window.scrollTo({ top: 120, behavior: 'smooth' });
+        }
+      } catch (err) {
+        console.error("Error analizando con Gemini:", err);
+        alert("No se pudo completar el análisis: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Analizar Progresión & Ajustar Cargas (IA)`;
+      }
+    };
+
+    window.dismissAiSuggestion = function() {
+      pendingSuggestedWeights = null;
+      document.getElementById('aiSuggestionBox').classList.add('hidden');
+    };
+
+    window.applySuggestedWeights = function() {
+      if (!pendingSuggestedWeights) return;
+      const session = getActiveSession();
+
+      session.exercises.forEach(ex => {
+        if (pendingSuggestedWeights[ex.name] !== undefined) {
+          ex.weight = pendingSuggestedWeights[ex.name];
+          ex.status = 'pending';
+        }
+      });
+
+      pendingSuggestedWeights = null;
+      document.getElementById('aiSuggestionBox').classList.add('hidden');
+      saveState();
+    };
+
+    // Chat AI Coach
+    window.sendCoachQuery = async function() {
+      const input = document.getElementById('coachPromptInput');
+      const queryText = input.value.trim();
+      if (!queryText) return;
+
+      const chatLog = document.getElementById('coachChatLog');
+
+      const userBubble = document.createElement('div');
+      userBubble.className = "bg-indigo-600 text-white p-2.5 rounded-xl ml-6 text-right leading-relaxed font-medium";
+      userBubble.textContent = queryText;
+      chatLog.appendChild(userBubble);
+
+      input.value = '';
+      chatLog.scrollTop = chatLog.scrollHeight;
+
+      const loadingBubble = document.createElement('div');
+      loadingBubble.className = "bg-slate-200 text-slate-600 p-2.5 rounded-xl mr-6 leading-relaxed flex items-center gap-2";
+      loadingBubble.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo-600"></i> Pensando...`;
+      chatLog.appendChild(loadingBubble);
+      chatLog.scrollTop = chatLog.scrollHeight;
+
+      const apiUrl = `[https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$](https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$){geminiApiKey}`;
+      const session = getActiveSession();
+      const systemInstructionText = `Eres un entrenador personal certificado y motivador. Responde conciso a dudas sobre entrenamiento o técnica. La rutina actual del usuario es: ${JSON.stringify(session)}.`;
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: `${systemInstructionText}\n\nPregunta: ${queryText}` }] }]
+          })
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const result = await response.json();
+        const text = result.candidates?.[0]?.content?.parts?.[0]?.text || "No pude generar respuesta en este momento.";
+
+        chatLog.removeChild(loadingBubble);
+
+        const aiBubble = document.createElement('div');
+        aiBubble.className = "bg-white border border-slate-200 text-slate-800 p-3 rounded-xl mr-6 leading-relaxed shadow-sm whitespace-pre-line";
+        aiBubble.textContent = text;
+        chatLog.appendChild(aiBubble);
+      } catch (err) {
+        if (loadingBubble.parentNode) chatLog.removeChild(loadingBubble);
+        const errBubble = document.createElement('div');
+        errBubble.className = "bg-rose-50 text-rose-700 p-2.5 rounded-xl text-xs";
+        errBubble.textContent = "Error al conectar con el Coach: " + err.message;
+        chatLog.appendChild(errBubble);
+      } finally {
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+    };
+
+    window.onload = function() {
+      renderAll();
+    };
+  </script>
+</body>
+</html>
