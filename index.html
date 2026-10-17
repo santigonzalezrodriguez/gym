@@ -27,7 +27,7 @@
     ::-webkit-scrollbar-track { background: #f1f5f9; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
     
-    /* Blindaje para evitar que los modales ocultos bloqueen los clics */
+    /* Regla crítica: evita que modales cerrados bloqueen clics en la interfaz */
     .hidden { display: none !important; }
     .modal-backdrop {
       position: fixed;
@@ -84,7 +84,7 @@
   <!-- Contenedor Principal -->
   <main class="max-w-xl mx-auto w-full px-3.5 pt-3.5 space-y-3.5 flex-1">
 
-    <!-- Estado No Autenticado (Por defecto si no hay sesión) -->
+    <!-- Estado No Autenticado (Por defecto si no hay sesión iniciada) -->
     <div id="unauthenticatedCard" class="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-3 shadow-sm">
       <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto text-xl">
         <i class="fa-solid fa-lock"></i>
@@ -602,7 +602,7 @@
     </div>
   </div>
 
-  <!-- Lógica Firebase y Gemini -->
+  <!-- Firebase y Gemini Integration -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -669,7 +669,6 @@
       return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
-    // Funciones del ciclo de vida y UI
     function setGymLocation(loc) {
       activeGymLocation = loc;
       localStorage.setItem('fit_active_gym', loc);
@@ -1716,7 +1715,7 @@ Instrucciones:
       }
     }
 
-    // Exponer todas las funciones al objeto global window para botones HTML inline
+    // Vinculación explícita de todas las funciones al objeto global window
     window.setGymLocation = setGymLocation;
     window.toggleLoginModal = toggleLoginModal;
     window.performLogin = performLogin;
@@ -1885,7 +1884,7 @@ Instrucciones:
       renderAll();
     }
 
-    // Inicialización inmediata garantizada (sin depender de window.onload)
+    // Arranque inmediato garantizado
     setGymLocation(activeGymLocation);
     renderAll();
     if ('serviceWorker' in navigator) {
