@@ -1,0 +1,2516 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FitTracker AI</title>
+
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FitTracker AI">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    
+    .hidden { display: none !important; }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 50;
+    }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translate(-50%, -10px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+    .toast-animate {
+      animation: toastIn 0.25s ease-out forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-full flex flex-col pb-20 select-none">
+
+  <!-- Contenedor de Toasts Discretos -->
+  <div id="toastContainer" class="fixed top-4 left-1/2 -translate-x-1/2 z-[60] flex flex-col gap-2 pointer-events-none w-full max-w-sm px-4"></div>
+
+  <!-- Header Limpio y Compacto (Mobile First) -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-xl mx-auto px-3.5 py-2.5 flex justify-between items-center gap-2">
+      
+      <!-- Isotipo -->
+      <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
+        <i class="fa-solid fa-dumbbell text-base"></i>
+      </div>
+
+      <!-- Conmutador Rápido de Sede [ CEN | POL ] -->
+      <div class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold shrink-0">
+        <button id="btnGymCen" onclick="setGymLocation('CEN')" class="px-2.5 py-1 rounded-lg transition bg-white text-indigo-600 shadow-sm">CEN</button>
+        <button id="btnGymPol" onclick="setGymLocation('POL')" class="px-2.5 py-1 rounded-lg transition text-slate-600 hover:text-indigo-600">POL</button>
+      </div>
+
+      <!-- Acciones de Cabecera -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button onclick="toggleRestTimerBar()" title="Temporizador de descanso" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition">
+          <i class="fa-solid fa-stopwatch text-xs"></i>
+        </button>
+
+        <button onclick="openExtraActivityModal()" title="Registrar Actividad Deportiva Extra" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1.5 rounded-xl transition text-xs font-bold flex items-center gap-1">
+          <i class="fa-solid fa-person-running text-amber-600"></i>
+          <span>+ Extra</span>
+        </button>
+
+        <button onclick="toggleCoachModal()" title="Consultar AI Coach" class="w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center transition">
+          <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+        </button>
+
+        <button onclick="openSettingsModal()" title="Catálogo de Ejercicios y Configuración" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition">
+          <i class="fa-solid fa-sliders text-xs"></i>
+        </button>
+
+        <button onclick="toggleLoginModal()" id="btnLoginIcon" title="Perfil y Sesión" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition">
+          <i id="userHeaderIcon" class="fa-solid fa-user text-xs"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Temporizador de Descanso Fijo Inferior -->
+  <div id="restTimerBar" class="hidden fixed bottom-0 left-0 right-0 z-30 bg-slate-900 border-t border-slate-800 text-white p-3 shadow-2xl transition-colors duration-300">
+    <div class="max-w-xl mx-auto flex items-center justify-between gap-2.5">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-stopwatch"></i>
+        </div>
+        <div>
+          <div id="restTimerCountdown" class="text-xl font-black font-mono tracking-tight leading-none text-white">01:30</div>
+          <div id="restTimerStatusText" class="text-[9px] text-slate-400 uppercase tracking-wider font-semibold mt-0.5">Descanso</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1">
+        <button onclick="setRestTimerPreset(60)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">60s</button>
+        <button onclick="setRestTimerPreset(90)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">90s</button>
+        <button onclick="setRestTimerPreset(120)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">120s</button>
+        <button onclick="setRestTimerPreset(180)" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold border border-slate-700 transition">180s</button>
+      </div>
+
+      <div class="flex items-center gap-1 shrink-0">
+        <button id="btnRestTimerToggle" onclick="toggleRestTimerRunning()" class="w-8 h-8 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center text-xs transition shadow-sm" title="Iniciar/Pausar">
+          <i id="restTimerPlayIcon" class="fa-solid fa-play"></i>
+        </button>
+        <button onclick="closeRestTimerBar()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition" title="Cerrar temporizador">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenedor Principal -->
+  <main class="max-w-xl mx-auto w-full px-3.5 pt-3.5 space-y-3.5 flex-1">
+
+    <div id="unauthenticatedCard" class="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-3 shadow-sm">
+      <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto text-xl">
+        <i class="fa-solid fa-lock"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-800">Inicia sesión para ver tus rutinas</h3>
+        <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Tus entrenamientos, histórico en Firestore y el Coach IA se sincronizarán al identificarte.</p>
+      </div>
+      <button onclick="toggleLoginModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-sm transition">
+        Iniciar Sesión
+      </button>
+    </div>
+
+    <!-- Contenido Autenticado -->
+    <div id="authenticatedApp" class="space-y-3.5 hidden">
+      
+      <!-- Selector de Sesiones -->
+      <section class="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm space-y-2.5">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-calendar-week text-indigo-600 text-xs"></i>
+            <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Tus Sesiones</h2>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="toggleHistoryModal()" class="text-xs font-semibold text-slate-600 hover:text-indigo-600 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition">
+              <i class="fa-solid fa-clock-rotate-left text-[11px]"></i> Historial
+            </button>
+            <button onclick="openNewSessionModal()" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+              <i class="fa-solid fa-plus text-[10px]"></i> Nueva
+            </button>
+          </div>
+        </div>
+        <div id="sessionTabs" class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none"></div>
+      </section>
+
+      <!-- Resumen de Sesión Activa -->
+      <section class="bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-2xl px-4 py-3 shadow-md shadow-indigo-100/50 flex items-center justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 mb-0.5">
+            <span class="text-[9px] bg-white/20 px-1.5 py-0.5 rounded font-extrabold uppercase tracking-wider text-indigo-100">Sesión Activa</span>
+            <span id="activeGymBadge" class="text-[9px] bg-indigo-900/40 border border-indigo-300/30 px-1.5 py-0.5 rounded font-extrabold text-white">Sede: CEN</span>
+          </div>
+          <h3 id="activeSessionTitle" class="text-sm font-bold truncate">Cargando...</h3>
+          <p id="lastCompletedDateText" class="text-[10px] text-indigo-200 truncate mt-0.5">• Sin completar aún</p>
+        </div>
+
+        <div class="flex items-center gap-3 shrink-0">
+          <div class="text-right">
+            <div id="activeSessionVolume" class="text-xs font-bold">0 kg</div>
+            <div id="sessionProgressText" class="text-[10px] text-indigo-200">0% hecho</div>
+          </div>
+          <div class="w-10 h-10 relative flex items-center justify-center">
+            <svg class="w-9 h-9 transform -rotate-90">
+              <circle cx="18" cy="18" r="14" stroke="currentColor" stroke-width="3" class="text-indigo-800/40" fill="transparent"/>
+              <circle id="sessionProgressCircle" cx="18" cy="18" r="14" stroke="currentColor" stroke-width="3" class="text-white transition-all duration-300" stroke-dasharray="88" stroke-dashoffset="88" fill="transparent"/>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- Propuesta de la IA -->
+      <div id="aiSuggestionBox" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs space-y-3 shadow-sm">
+        <div class="font-bold text-amber-900 flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles text-amber-600"></i>
+            <span>Propuesta Semanal (Head Coach IA)</span>
+          </div>
+          <span id="aiSuggestionGymTag" class="text-[10px] bg-amber-100 border border-amber-300 text-amber-800 px-2 py-0.5 rounded-full font-bold">Sede CEN</span>
+        </div>
+        <p id="aiSuggestionText" class="text-slate-700 leading-relaxed text-[11px]"></p>
+        
+        <div id="aiChangesContainer" class="space-y-1.5 pt-1"></div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-amber-200/60">
+          <button onclick="dismissAiSuggestion()" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-semibold text-xs">Descartar</button>
+          <button onclick="applySelectedAiSuggestions()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-sm flex items-center gap-1">
+            <i class="fa-solid fa-check text-[10px]"></i> Aplicar Plan Semanal
+          </button>
+        </div>
+      </div>
+
+      <!-- Lista de Ejercicios -->
+      <section class="space-y-2.5">
+        <div class="flex justify-between items-center px-1">
+          <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <span>Ejercicios</span>
+            <span id="exerciseCountBadge" class="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold">0</span>
+          </h3>
+          <div class="flex items-center gap-2">
+            <button onclick="completeCurrentWorkoutSession()" id="btnFinishSession" title="Guardar entrenamiento en historial" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-floppy-disk text-[11px]"></i> Guardar
+            </button>
+            <button onclick="openAddExerciseModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-plus text-[10px]"></i> Añadir
+            </button>
+          </div>
+        </div>
+        <div id="exerciseList" class="space-y-2"></div>
+      </section>
+
+      <!-- Botón de Planificación Semanal -->
+      <section class="pt-1">
+        <button onclick="openPlanWeekModal()" id="btnAnalyze" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-2xl shadow-lg transition flex items-center justify-center gap-2 text-xs">
+          <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+          <span>Planificar Semana & Periodización (Head Coach IA)</span>
+        </button>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Modal Selector de Días Semanales -->
+  <div id="planWeekModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <i class="fa-solid fa-calendar-check text-xs"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-900">Planificar Próxima Semana</h3>
+        </div>
+        <button onclick="closePlanWeekModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-2">¿Cuántos días de gimnasio vas a entrenar?</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" onclick="selectPlanDays(2)" id="planDayBtn_2" class="plan-day-btn py-2.5 rounded-xl border border-slate-200 font-bold hover:border-indigo-600 text-slate-700 transition">2 días</button>
+            <button type="button" onclick="selectPlanDays(3)" id="planDayBtn_3" class="plan-day-btn py-2.5 rounded-xl border border-indigo-600 bg-indigo-50 font-bold text-indigo-600 transition shadow-sm">3 días</button>
+            <button type="button" onclick="selectPlanDays(4)" id="planDayBtn_4" class="plan-day-btn py-2.5 rounded-xl border border-slate-200 font-bold hover:border-indigo-600 text-slate-700 transition">4 días</button>
+            <button type="button" onclick="selectPlanDays(5)" id="planDayBtn_5" class="plan-day-btn py-2.5 rounded-xl border border-slate-200 font-bold hover:border-indigo-600 text-slate-700 transition">5 días</button>
+          </div>
+        </div>
+
+        <p class="text-[11px] text-slate-500 leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+          La IA adaptará exactamente las sesiones de tu semana a la cantidad de días elegida, distribuyendo el volumen óptimo y respetando tus ejercicios bloqueados.
+        </p>
+
+        <div class="pt-2">
+          <button onclick="executePlanWeekAnalysis()" id="btnSubmitPlanWeek" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl transition shadow-md flex items-center justify-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
+            <span>Generar Planificación Semanal</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Iniciar Sesión -->
+  <div id="loginModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <i class="fa-solid fa-user-lock text-xs"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-900">Acceso a FitTracker</h3>
+        </div>
+        <button onclick="toggleLoginModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="loggedOutContent" class="space-y-3">
+        <p class="text-xs text-slate-500">Inicia sesión para sincronizar tus rutinas en Firestore y activar el Coach IA.</p>
+        <div id="authErrorMessage" class="hidden text-[11px] bg-rose-50 border border-rose-200 text-rose-700 p-2.5 rounded-xl leading-relaxed"></div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Correo electrónico</label>
+          <input type="email" id="loginEmail" placeholder="usuario@email.com" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+            onkeydown="if(event.key==='Enter') performLogin()">
+        </div>
+        <div class="pt-2">
+          <button onclick="performLogin()" id="btnLoginSubmit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
+            <span>Iniciar Sesión</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="loggedInContent" class="hidden space-y-3 text-xs">
+        <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 space-y-1">
+          <div class="font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>Sesión iniciada</span>
+          </div>
+          <div id="userEmailDisplay" class="font-mono text-[11px] text-slate-600 truncate"></div>
+        </div>
+        <div class="pt-2">
+          <button onclick="performLogout()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2 rounded-xl text-xs font-bold transition">
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Añadir / Editar Ejercicio -->
+  <div id="exerciseModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 id="exerciseModalTitle" class="text-base font-bold text-slate-900">Añadir Ejercicio</h3>
+        <button onclick="closeExerciseModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form id="exerciseForm" class="space-y-3">
+        <input type="hidden" id="editExerciseId" value="">
+
+        <div class="relative">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre del Ejercicio (Catálogo)</label>
+          <input type="text" id="modalExName" placeholder="Buscar ejercicio en tu catálogo..." autocomplete="off" required
+            oninput="handleCatalogSearch(this.value)"
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-semibold">
+          <div id="catalogAutocompleteDropdown" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 p-1 text-xs"></div>
+          <div id="autoLoadedAlert" class="hidden text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg p-1.5 mt-1 font-medium flex items-center gap-1">
+            <i class="fa-solid fa-circle-check text-indigo-600"></i>
+            <span id="autoLoadedAlertText">Datos cargados del catálogo</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-500 mb-1">Medición</label>
+            <select id="modalExType" onchange="updateExMeasureLabel()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-semibold">
+              <option value="reps">Repeticiones</option>
+              <option value="time">Tiempo (Segundos)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-semibold text-slate-500 mb-1">Grupo Muscular</label>
+            <select id="modalExGroup" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-semibold">
+              <option value="Pecho">Pecho</option>
+              <option value="Espalda">Espalda</option>
+              <option value="Pierna">Pierna</option>
+              <option value="Hombro">Hombro</option>
+              <option value="Bíceps">Bíceps</option>
+              <option value="Tríceps">Tríceps</option>
+              <option value="Core">Core</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Series</label>
+            <input type="number" id="modalExSets" placeholder="3" min="1" required
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-medium">
+          </div>
+          <div>
+            <label id="lblModalExReps" class="block text-xs font-semibold text-slate-700 mb-1">Reps Meta</label>
+            <input type="number" id="modalExReps" placeholder="10" min="1" required
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-medium">
+          </div>
+        </div>
+
+        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Carga según Gimnasio (kg)</span>
+            <label class="flex items-center gap-1 text-[10px] text-indigo-700 font-bold cursor-pointer">
+              <input type="checkbox" id="modalExSyncWeights" onchange="handleModalSyncWeightsToggle(this.checked)" class="w-3.5 h-3.5 text-indigo-600 rounded">
+              <span>Sincronizar peso en ambas sedes</span>
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] font-semibold text-indigo-700 mb-0.5">Sede Centro (CEN)</label>
+              <input type="number" step="0.5" id="modalExWeightCen" placeholder="60" required
+                oninput="onModalWeightChanged('CEN', this.value)"
+                class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-bold">
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-indigo-700 mb-0.5">Sede Polígono (POL)</label>
+              <input type="number" step="0.5" id="modalExWeightPol" placeholder="60" required
+                oninput="onModalWeightChanged('POL', this.value)"
+                class="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-bold">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-1">
+            <label class="block text-xs font-semibold text-slate-700">Tempo (Excéntrico-Pausa-Concéntrico-Pausa)</label>
+            <span class="text-[9px] text-slate-400">Ej: 3-1-1-0</span>
+          </div>
+          <input type="text" id="modalExTempo" placeholder="3-1-1-0" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-mono">
+          <div class="flex gap-1.5 mt-1.5">
+            <button type="button" onclick="setTempoPreset('3-1-1-0')" class="text-[9px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded font-medium">3-1-1-0 (Hipertrofia)</button>
+            <button type="button" onclick="setTempoPreset('2-0-1-0')" class="text-[9px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded font-medium">2-0-1-0 (Estándar)</button>
+            <button type="button" onclick="setTempoPreset('4-1-1-0')" class="text-[9px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded font-medium">4-1-1-0 (Control)</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" id="modalExLocked" class="w-4 h-4 text-indigo-600 rounded">
+          <label for="modalExLocked" class="text-xs text-slate-700 font-medium">🔒 Bloquear ejercicio (Inamovible para la IA)</label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <button type="button" onclick="closeExerciseModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Registrar Actividad Deportiva Extra -->
+  <div id="extraActivityModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+            <i class="fa-solid fa-person-running text-xs"></i>
+          </div>
+          <h3 class="text-sm font-bold text-slate-900">Registrar Actividad Extra</h3>
+        </div>
+        <button onclick="closeExtraActivityModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nombre de la Actividad</label>
+          <input type="text" id="extraActivityName" placeholder="Ej: Artes Marciales, Series de Flexiones, Calistenia..." 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-semibold">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nivel de Fatiga Residual</label>
+          <select id="extraActivityFatigue" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 font-semibold">
+            <option value="Moderada">🟡 Moderada (Recuperable)</option>
+            <option value="Extrema">🔴 Extrema (Destroce muscular/articular)</option>
+            <option value="Ligera">🟢 Ligera (Buenas sensaciones)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Detalles / Volumen</label>
+          <input type="text" id="extraActivityNotes" placeholder="Ej: 20x10 flexiones antes de entrenar + combate" 
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800">
+        </div>
+
+        <div class="pt-2">
+          <button onclick="saveExtraActivity()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 rounded-xl transition shadow-sm">
+            Guardar Actividad Extra
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Configuración & Catálogo de Ejercicios Permitidos -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-indigo-600"></i>
+          <h3 class="text-base font-bold text-slate-900">Catálogo de Ejercicios Permitidos</h3>
+        </div>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-3 text-xs pr-1">
+        <p class="text-slate-500 text-[11px] leading-relaxed">
+          Los ejercicios de peso libre (mancuernas, barras) pueden compartir peso en ambos gimnasios marcando la casilla de sincronización.
+        </p>
+
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+          <div class="font-bold text-slate-800 text-xs">Añadir Nuevo Ejercicio al Catálogo</div>
+          <div class="grid grid-cols-2 gap-2">
+            <input type="text" id="newCatName" placeholder="Nombre (ej. Press Mancuernas)" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800">
+            <select id="newCatGroup" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800">
+              <option value="Pecho">Pecho</option>
+              <option value="Espalda">Espalda</option>
+              <option value="Pierna">Pierna</option>
+              <option value="Hombro">Hombro</option>
+              <option value="Bíceps">Bíceps</option>
+              <option value="Tríceps">Tríceps</option>
+              <option value="Core">Core</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-4 gap-1.5">
+            <input type="number" id="newCatSets" placeholder="Sets (3)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
+            <input type="number" id="newCatReps" placeholder="Reps (10)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
+            <input type="number" step="0.5" id="newCatWeightCen" placeholder="CEN kg" oninput="onNewCatWeightChanged('CEN', this.value)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
+            <input type="number" step="0.5" id="newCatWeightPol" placeholder="POL kg" oninput="onNewCatWeightChanged('POL', this.value)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
+          </div>
+          <div class="pt-1 space-y-1.5">
+            <label class="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 cursor-pointer">
+              <input type="checkbox" id="newCatSyncWeights" onchange="onNewCatSyncToggled(this.checked)" checked class="w-3.5 h-3.5 text-indigo-600 rounded">
+              <span>Mismo peso en CEN y POL (peso libre/mismo material)</span>
+            </label>
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-3">
+                <label class="flex items-center gap-1 text-[11px] font-medium"><input type="checkbox" id="newCatCen" checked> En CEN</label>
+                <label class="flex items-center gap-1 text-[11px] font-medium"><input type="checkbox" id="newCatPol" checked> En POL</label>
+              </div>
+              <button onclick="addCatalogItem()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition">
+                + Añadir
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="catalogList" class="space-y-1.5 pt-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Histórico y Calendario Local -->
+  <div id="historyModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-calendar-days text-indigo-600"></i>
+          <h3 class="text-base font-bold text-slate-900">Historial (Hora Local)</h3>
+        </div>
+        <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 flex-1 overflow-y-auto pr-1">
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-2">
+          <div class="flex justify-between items-center px-1">
+            <button onclick="changeCalendarMonth(-1)" class="p-1.5 text-slate-600 hover:text-indigo-600 rounded-lg transition"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+            <span id="calendarMonthLabel" class="text-xs font-bold text-slate-800 capitalize"></span>
+            <button onclick="changeCalendarMonth(1)" class="p-1.5 text-slate-600 hover:text-indigo-600 rounded-lg transition"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+          </div>
+          <div class="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 uppercase pt-1">
+            <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+          </div>
+          <div id="calendarGrid" class="grid grid-cols-7 gap-1 text-xs"></div>
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <div class="flex justify-between items-center">
+            <span id="selectedDateTitle" class="text-xs font-bold text-slate-800"></span>
+            <span id="selectedDateBadge" class="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold border border-indigo-100"></span>
+          </div>
+          <div id="dayLogsContainer" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Coach IA Chat -->
+  <div id="coachModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-4 shadow-2xl h-[80vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900">AI Coach Personal</h3>
+            <p class="text-[10px] text-slate-500">Dudas de técnica, fatiga acumulada y sustitutos</p>
+          </div>
+        </div>
+        <button onclick="toggleCoachModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div id="coachChatLog" class="flex-1 overflow-y-auto space-y-3 p-1 text-xs">
+        <div class="bg-indigo-50 border border-indigo-100 text-indigo-900 p-3 rounded-2xl leading-relaxed">
+          👋 ¡Hola! Soy tu asistente de entrenamiento. Pregúntame dudas de ejecución, tempos o cómo adaptar la sesión según la fatiga de tus actividades extra.
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex gap-2 shrink-0">
+        <input type="text" id="coachPromptInput" placeholder="Ej: Me duele el hombro al hacer press, ¿qué variante uso?" 
+          class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500"
+          onkeydown="if(event.key==='Enter') sendCoachQuery()">
+        <button onclick="sendCoachQuery()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Nueva Sesión -->
+  <div id="newSessionModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-sm space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h3 class="text-base font-bold text-slate-900">Crear Nueva Sesión</h3>
+        <button onclick="closeNewSessionModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Sesión</label>
+        <input type="text" id="newSessionNameInput" placeholder="Ej: Torso Hipertrofia..." 
+          class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium">
+      </div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeNewSessionModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
+        <button onclick="createNewSession()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Confirmar Eliminación -->
+  <div id="deleteConfirmModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-xs space-y-4 shadow-2xl text-center">
+      <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-xl">
+        <i class="fa-solid fa-trash-can"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-900">¿Eliminar ejercicio?</h3>
+        <p class="text-xs text-slate-500 mt-1">Se quitará de la sesión activa.</p>
+      </div>
+      <div class="flex justify-center gap-2 pt-2 border-t border-slate-100">
+        <button onclick="closeDeleteConfirmModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition flex-1">Cancelar</button>
+        <button onclick="confirmDeleteExercise()" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition flex-1">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase y Gemini Integration -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, collection, addDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBxDsbym6-ONm-mW7Ldx3pXxmF_ZJbms5M",
+      authDomain: "gym-tracker-b1669.firebaseapp.com",
+      projectId: "gym-tracker-b1669",
+      storageBucket: "gym-tracker-b1669.firebasestorage.app",
+      messagingSenderId: "213811562088",
+      appId: "1:213811562088:web:eb0171e3d581295a125ddd",
+      measurementId: "G-2Q9Z54425P"
+    };
+
+    const appId = "fit-tracker-app";
+    const GEMINI_MODEL = 'gemini-2.5-flash';
+    function geminiUrl(key) {
+      return 'https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + encodeURIComponent(key);
+    }
+    let geminiApiKey = null;
+    let app = null, auth = null, db = null, currentUser = null;
+    let unsubscribeMainState = null, unsubscribeLogs = null;
+
+    let activeGymLocation = localStorage.getItem('fit_active_gym') || 'CEN';
+    let targetWeekDays = 3;
+
+    let workoutSessions = [];
+    let workoutLogs = [];
+
+    let allowedCatalog = JSON.parse(localStorage.getItem('fit_allowed_catalog')) || [
+      { id: "cat_press_banca", name: "Press de Banca Plano", group: "Pecho", type: "reps", defaultSets: 4, defaultReps: 8, tempo: "3-1-1-0", weights: { CEN: 60, POL: 60 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_press_inc_manc", name: "Press Inclinado Mancuernas", group: "Pecho", type: "reps", defaultSets: 3, defaultReps: 10, tempo: "2-0-1-0", weights: { CEN: 22, POL: 22 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_fondos", name: "Fondos en Paralelas", group: "Pecho", type: "reps", defaultSets: 3, defaultReps: 10, tempo: "2-1-1-0", weights: { CEN: 0, POL: 0 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_aperturas_polea", name: "Aperturas en Polea", group: "Pecho", type: "reps", defaultSets: 3, defaultReps: 12, tempo: "2-0-1-1", weights: { CEN: 15, POL: 25 }, inCen: true, inPol: true, syncWeights: false },
+      { id: "cat_dominadas", name: "Dominadas Pronas", group: "Espalda", type: "reps", defaultSets: 4, defaultReps: 8, tempo: "2-1-1-0", weights: { CEN: 0, POL: 0 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_remo_barra", name: "Remo con Barra", group: "Espalda", type: "reps", defaultSets: 3, defaultReps: 10, tempo: "2-1-1-0", weights: { CEN: 50, POL: 50 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_remo_gironda", name: "Remo Gironda en Polea", group: "Espalda", type: "reps", defaultSets: 3, defaultReps: 12, tempo: "2-0-1-1", weights: { CEN: 45, POL: 65 }, inCen: true, inPol: true, syncWeights: false },
+      { id: "cat_jalon_pecho", name: "Jalón al Pecho", group: "Espalda", type: "reps", defaultSets: 3, defaultReps: 10, tempo: "3-0-1-0", weights: { CEN: 55, POL: 75 }, inCen: true, inPol: true, syncWeights: false },
+      { id: "cat_sentadilla", name: "Sentadilla Trasera con Barra", group: "Pierna", type: "reps", defaultSets: 4, defaultReps: 8, tempo: "3-1-1-0", weights: { CEN: 70, POL: 70 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_peso_muerto_rum", name: "Peso Muerto Rumano (RDL)", group: "Pierna", type: "reps", defaultSets: 4, defaultReps: 10, tempo: "3-1-1-0", weights: { CEN: 65, POL: 65 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_prensa", name: "Prensa de Piernas 45°", group: "Pierna", type: "reps", defaultSets: 3, defaultReps: 12, tempo: "2-0-1-0", weights: { CEN: 120, POL: 150 }, inCen: true, inPol: true, syncWeights: false },
+      { id: "cat_press_militar", name: "Press Militar Barra", group: "Hombro", type: "reps", defaultSets: 3, defaultReps: 8, tempo: "2-1-1-0", weights: { CEN: 40, POL: 40 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_elev_laterales", name: "Elevaciones Laterales", group: "Hombro", type: "reps", defaultSets: 4, defaultReps: 12, tempo: "2-0-1-1", weights: { CEN: 10, POL: 10 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_face_pull", name: "Face Pulls Polea", group: "Hombro", type: "reps", defaultSets: 4, defaultReps: 15, tempo: "2-0-1-1", weights: { CEN: 20, POL: 30 }, inCen: true, inPol: true, syncWeights: false },
+      { id: "cat_curl_biceps", name: "Curl Bíceps Barra Z", group: "Bíceps", type: "reps", defaultSets: 3, defaultReps: 10, tempo: "3-0-1-0", weights: { CEN: 25, POL: 25 }, inCen: true, inPol: true, syncWeights: true },
+      { id: "cat_triceps_polea", name: "Extensiones Tríceps Polea", group: "Tríceps", type: "reps", defaultSets: 3, defaultReps: 12, tempo: "2-0-1-1", weights: { CEN: 25, POL: 40 }, inCen: true, inPol: true, syncWeights: false },
+      { id: "cat_plancha", name: "Plancha Abdominal", group: "Core", type: "time", defaultSets: 3, defaultReps: 60, tempo: "Isometría", weights: { CEN: 0, POL: 0 }, inCen: true, inPol: true, syncWeights: true }
+    ];
+
+    let activeSessionIndex = 0;
+    let pendingAiProposal = null;
+    let openFeedbackIndex = null;
+    let exerciseToDeleteIndex = null;
+
+    let currentCalendarDate = new Date();
+    let selectedCalendarDateStr = getLocalDateString(new Date());
+
+    let restTimerDuration = 90;
+    let restTimerEndTime = null;
+    let restTimerInterval = null;
+    let isRestTimerRunning = false;
+    let audioCtx = null;
+
+    function getLocalDateString(d = new Date()) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      let bgClass = "bg-slate-900 border-slate-700 text-white";
+      let icon = "fa-circle-info";
+
+      if (type === 'success') {
+        bgClass = "bg-emerald-600 border-emerald-500 text-white";
+        icon = "fa-circle-check";
+      } else if (type === 'error') {
+        bgClass = "bg-rose-600 border-rose-500 text-white";
+        icon = "fa-triangle-exclamation";
+      } else if (type === 'info') {
+        bgClass = "bg-indigo-600 border-indigo-500 text-white";
+        icon = "fa-circle-info";
+      }
+
+      toast.className = `toast-animate flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-semibold shadow-xl ${bgClass} transition-all duration-300 pointer-events-auto`;
+      toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i><span class="flex-1">${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translate(-50%, -10px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function toggleRestTimerBar() {
+      const bar = document.getElementById('restTimerBar');
+      if (!bar) return;
+      if (bar.classList.contains('hidden')) {
+        bar.classList.remove('hidden');
+        if (!isRestTimerRunning) {
+          updateRestTimerDisplay(restTimerDuration * 1000);
+        }
+      } else {
+        bar.classList.add('hidden');
+      }
+    }
+
+    function closeRestTimerBar() {
+      const bar = document.getElementById('restTimerBar');
+      if (bar) bar.classList.add('hidden');
+      stopRestTimer();
+    }
+
+    function setRestTimerPreset(seconds) {
+      restTimerDuration = seconds;
+      startRestTimer(seconds);
+    }
+
+    function toggleRestTimerRunning() {
+      if (isRestTimerRunning) {
+        stopRestTimer();
+      } else {
+        startRestTimer(restTimerDuration);
+      }
+    }
+
+    function startRestTimer(seconds = null) {
+      if (seconds !== null) {
+        restTimerDuration = seconds;
+      }
+      const bar = document.getElementById('restTimerBar');
+      if (bar) {
+        bar.classList.remove('hidden');
+        bar.classList.remove('bg-rose-700', 'border-rose-600');
+        bar.classList.add('bg-slate-900', 'border-slate-800');
+      }
+
+      const statusText = document.getElementById('restTimerStatusText');
+      if (statusText) statusText.textContent = "Descanso en curso";
+
+      const playIcon = document.getElementById('restTimerPlayIcon');
+      if (playIcon) playIcon.className = "fa-solid fa-pause";
+
+      restTimerEndTime = Date.now() + (restTimerDuration * 1000);
+      isRestTimerRunning = true;
+
+      if (restTimerInterval) clearInterval(restTimerInterval);
+      updateRestTimerCountdown();
+      restTimerInterval = setInterval(updateRestTimerCountdown, 250);
+    }
+
+    function stopRestTimer() {
+      isRestTimerRunning = false;
+      if (restTimerInterval) {
+        clearInterval(restTimerInterval);
+        restTimerInterval = null;
+      }
+      const playIcon = document.getElementById('restTimerPlayIcon');
+      if (playIcon) playIcon.className = "fa-solid fa-play";
+      const statusText = document.getElementById('restTimerStatusText');
+      if (statusText) statusText.textContent = "Pausado";
+    }
+
+    function updateRestTimerCountdown() {
+      if (!isRestTimerRunning || !restTimerEndTime) return;
+      const remainingMs = restTimerEndTime - Date.now();
+
+      if (remainingMs <= 0) {
+        updateRestTimerDisplay(0);
+        stopRestTimer();
+        triggerRestTimerAlarm();
+        return;
+      }
+
+      updateRestTimerDisplay(remainingMs);
+    }
+
+    function updateRestTimerDisplay(ms) {
+      const totalSec = Math.max(0, Math.ceil(ms / 1000));
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      const text = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      const el = document.getElementById('restTimerCountdown');
+      if (el) el.textContent = text;
+    }
+
+    function triggerRestTimerAlarm() {
+      const bar = document.getElementById('restTimerBar');
+      if (bar) {
+        bar.classList.remove('bg-slate-900', 'border-slate-800');
+        bar.classList.add('bg-rose-700', 'border-rose-600');
+      }
+
+      const statusText = document.getElementById('restTimerStatusText');
+      if (statusText) statusText.textContent = "¡Tiempo finalizado!";
+
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([200, 100, 200, 100, 300]);
+      }
+
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (audioCtx) {
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.5);
+        }
+      } catch (e) {
+        console.warn("Audio Context error:", e);
+      }
+    }
+
+    function findExerciseById(exerciseId) {
+      if (!exerciseId || !workoutSessions) return null;
+      for (const session of workoutSessions) {
+        if (session.exercises && Array.isArray(session.exercises)) {
+          const ex = session.exercises.find(e => e.id === exerciseId);
+          if (ex) return { session, ex };
+        }
+      }
+      return null;
+    }
+
+    function getLastPerformance(ex) {
+      if (!workoutLogs || workoutLogs.length === 0 || !ex) return null;
+
+      for (const log of workoutLogs) {
+        if (log.isExtraActivity || !log.exercisesDetail) continue;
+
+        const match = log.exercisesDetail.find(d => {
+          if (d.status !== 'completed') return false;
+          if (ex.id && d.id) return d.id === ex.id;
+          return d.name && d.name.toLowerCase() === ex.name.toLowerCase();
+        });
+
+        if (match) {
+          let dateStr = '';
+          if (log.localDate) {
+            const parts = log.localDate.split('-');
+            if (parts.length === 3) {
+              const dObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+              dateStr = dObj.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+            }
+          }
+          if (!dateStr && log.createdAt) {
+            dateStr = new Date(log.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+          }
+
+          let seriesText = '';
+          if (match.setsDetail && Array.isArray(match.setsDetail) && match.setsDetail.length > 0) {
+            const doneSets = match.setsDetail.filter(s => s.done);
+            const targetSets = doneSets.length > 0 ? doneSets : match.setsDetail;
+            seriesText = targetSets.map(s => `${s.weight}×${s.reps}`).join(', ');
+          }
+
+          return {
+            weight: match.weight ?? 0,
+            rpe: match.rpe || null,
+            date: dateStr,
+            seriesText: seriesText || null
+          };
+        }
+      }
+      return null;
+    }
+
+    function syncUnfinishedSetsToPlan(ex) {
+      if (!ex || !ex.setsLog || !Array.isArray(ex.setsLog)) return;
+      const targetWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined)
+        ? ex.weights[activeGymLocation]
+        : (ex.weight !== undefined ? ex.weight : 0);
+      const targetReps = parseInt(ex.reps) || 10;
+
+      ex.setsLog.forEach(s => {
+        if (s.done === false) {
+          s.weight = targetWeight;
+          s.reps = targetReps;
+        }
+      });
+    }
+
+    function ensureExerciseSetsLog(ex) {
+      const plannedSets = parseInt(ex.sets) || 1;
+      const defaultWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) 
+        ? ex.weights[activeGymLocation] 
+        : (ex.weight || 0);
+      const defaultReps = parseInt(ex.reps) || 10;
+
+      if (!ex.setsLog || !Array.isArray(ex.setsLog)) {
+        ex.setsLog = [];
+      }
+
+      while (ex.setsLog.length < plannedSets) {
+        ex.setsLog.push({
+          weight: defaultWeight,
+          reps: defaultReps,
+          done: false
+        });
+      }
+
+      if (ex.setsLog.length > plannedSets) {
+        ex.setsLog = ex.setsLog.slice(0, plannedSets);
+      }
+    }
+
+    function setGymLocation(loc) {
+      activeGymLocation = loc;
+      localStorage.setItem('fit_active_gym', loc);
+      
+      const btnCen = document.getElementById('btnGymCen');
+      const btnPol = document.getElementById('btnGymPol');
+      if (btnCen && btnPol) {
+        if (loc === 'CEN') {
+          btnCen.className = "px-2.5 py-1 rounded-lg transition bg-white text-indigo-600 shadow-sm";
+          btnPol.className = "px-2.5 py-1 rounded-lg transition text-slate-600 hover:text-indigo-600";
+        } else {
+          btnPol.className = "px-2.5 py-1 rounded-lg transition bg-white text-indigo-600 shadow-sm";
+          btnCen.className = "px-2.5 py-1 rounded-lg transition text-slate-600 hover:text-indigo-600";
+        }
+      }
+
+      const badge = document.getElementById('activeGymBadge');
+      if (badge) badge.textContent = `Sede: ${loc}`;
+
+      if (workoutSessions && Array.isArray(workoutSessions)) {
+        workoutSessions.forEach(session => {
+          if (session.exercises && Array.isArray(session.exercises)) {
+            session.exercises.forEach(ex => {
+              syncUnfinishedSetsToPlan(ex);
+            });
+          }
+        });
+      }
+
+      renderAll();
+    }
+
+    function getActiveSession() {
+      if (!workoutSessions || workoutSessions.length === 0) return null;
+      return workoutSessions[activeSessionIndex] || workoutSessions[0];
+    }
+
+    function renderAll() {
+      renderSessionTabs();
+      renderActiveSession();
+      renderCatalogSettings();
+    }
+
+    function renderSessionTabs() {
+      const tabs = document.getElementById('sessionTabs');
+      if (!tabs) return;
+      tabs.innerHTML = '';
+
+      if (workoutSessions.length === 0) return;
+      if (activeSessionIndex >= workoutSessions.length) activeSessionIndex = 0;
+
+      workoutSessions.forEach((sess, idx) => {
+        const isActive = idx === activeSessionIndex;
+        const btn = document.createElement('button');
+        btn.className = `px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+          isActive 
+            ? 'bg-indigo-600 text-white shadow-sm' 
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'
+        }`;
+        btn.innerHTML = `<span>${escapeHtml(sess.name)}</span>`;
+        btn.onclick = () => {
+          activeSessionIndex = idx;
+          openFeedbackIndex = null;
+          renderAll();
+        };
+        tabs.appendChild(btn);
+      });
+    }
+
+    function renderActiveSession() {
+      const session = getActiveSession();
+      if (!session) return;
+
+      const titleEl = document.getElementById('activeSessionTitle');
+      if (titleEl) titleEl.textContent = session.name;
+
+      const dateText = document.getElementById('lastCompletedDateText');
+      if (dateText) {
+        if (session.lastCompleted) {
+          const d = new Date(session.lastCompleted);
+          dateText.textContent = `• Última: ${d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}`;
+        } else {
+          dateText.textContent = '• Sin completar aún';
+        }
+      }
+
+      let totalVolume = 0;
+      let completedCount = 0;
+      if (!session.exercises) session.exercises = [];
+
+      session.exercises.forEach(ex => {
+        ensureExerciseSetsLog(ex);
+
+        if (ex.status === 'completed') {
+          completedCount++;
+        }
+
+        if (ex.type !== 'time') {
+          if (ex.setsLog && Array.isArray(ex.setsLog)) {
+            const doneSets = ex.setsLog.filter(s => s.done);
+            if (doneSets.length > 0) {
+              doneSets.forEach(s => {
+                totalVolume += (Number(s.weight) || 0) * (Number(s.reps) || 0);
+              });
+            } else if (ex.status === 'completed') {
+              const currentWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) 
+                ? ex.weights[activeGymLocation] 
+                : (ex.weight || 0);
+              totalVolume += (ex.sets * ex.reps * currentWeight);
+            }
+          } else if (ex.status === 'completed') {
+            const currentWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) 
+              ? ex.weights[activeGymLocation] 
+              : (ex.weight || 0);
+            totalVolume += (ex.sets * ex.reps * currentWeight);
+          }
+        }
+      });
+
+      const volEl = document.getElementById('activeSessionVolume');
+      if (volEl) volEl.textContent = `${totalVolume.toLocaleString()} kg total`;
+
+      const totalExercises = session.exercises.length;
+      const progressPercent = totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
+
+      const progEl = document.getElementById('sessionProgressText');
+      if (progEl) progEl.textContent = `${progressPercent}% hecho`;
+
+      const circle = document.getElementById('sessionProgressCircle');
+      if (circle) circle.style.strokeDashoffset = 88 - (88 * progressPercent / 100);
+
+      const badgeEl = document.getElementById('exerciseCountBadge');
+      if (badgeEl) badgeEl.textContent = totalExercises;
+
+      const list = document.getElementById('exerciseList');
+      if (!list) return;
+      list.innerHTML = '';
+
+      if (totalExercises === 0) {
+        list.innerHTML = `<div class="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400">
+          No hay ejercicios planificados. Pulsa "+ Añadir" para seleccionar de tu catálogo.
+        </div>`;
+        return;
+      }
+
+      session.exercises.forEach((ex, idx) => {
+        const isCompleted = ex.status === 'completed';
+        const isSkipped = ex.status === 'skipped';
+        const isFeedbackOpen = openFeedbackIndex === idx;
+        const currentWeight = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
+        
+        const lastPerf = getLastPerformance(ex);
+        let lastPerfHtml = '';
+        if (lastPerf) {
+          let perfDesc = '';
+          if (lastPerf.seriesText) {
+            perfDesc = lastPerf.seriesText;
+          } else {
+            perfDesc = `${lastPerf.weight} kg`;
+          }
+          if (lastPerf.rpe) perfDesc += ` · RPE ${lastPerf.rpe}`;
+          if (lastPerf.date) perfDesc += ` · ${lastPerf.date}`;
+
+          lastPerfHtml = `<div class="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px] text-slate-400"></i><span>Última vez: ${escapeHtml(perfDesc)}</span></div>`;
+        }
+
+        const item = document.createElement('div');
+        item.className = `bg-white border rounded-xl transition shadow-sm overflow-hidden ${
+          isCompleted 
+            ? 'border-emerald-300 bg-emerald-50/20' 
+            : isSkipped 
+              ? 'border-rose-300 bg-rose-50/40' 
+              : 'border-slate-200'
+        }`;
+
+        item.innerHTML = `
+          <div class="p-3 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 flex-1 min-w-0">
+              <button onclick="toggleExerciseStatus(${idx})" 
+                class="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition border ${
+                  isCompleted 
+                    ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm' 
+                    : isSkipped 
+                      ? 'bg-rose-500 border-rose-600 text-white shadow-sm' 
+                      : 'bg-slate-100 border-slate-300 text-slate-400 hover:border-slate-400'
+                }">
+                <i class="fa-solid ${isCompleted ? 'fa-check' : isSkipped ? 'fa-xmark' : 'fa-circle'} text-xs"></i>
+              </button>
+
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-slate-800 text-xs truncate ${isSkipped ? 'line-through text-rose-700/70' : ''}">${escapeHtml(ex.name)}</span>
+                  ${ex.syncWeights ? `<span title="Peso sincronizado entre CEN y POL" class="text-[10px] text-indigo-500"><i class="fa-solid fa-link"></i></span>` : ''}
+                  <button onclick="toggleExerciseLock(${idx})" title="${ex.isLocked ? 'Bloqueado (Inamovible para la IA)' : 'Desbloqueado (Rotable por la IA)'}" class="text-[10px] text-slate-400 hover:text-indigo-600">
+                    <i class="fa-solid ${ex.isLocked ? 'fa-lock text-amber-500' : 'fa-lock-open text-slate-300'}"></i>
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
+                  <span class="font-semibold text-slate-700">${ex.sets}×${ex.reps}${ex.type === 'time' ? 's' : ''}</span>
+                  <span class="text-slate-300">•</span>
+                  <span class="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 text-[10px]">${currentWeight} kg (${activeGymLocation})</span>
+                  ${ex.tempo ? `<span class="bg-violet-50 text-violet-700 border border-violet-100 px-1 py-0.2 rounded text-[9px] font-mono font-medium" title="Tempo: Excéntrico - Pausa - Concéntrico"><i class="fa-solid fa-stopwatch text-[8px] mr-0.5"></i>${escapeHtml(ex.tempo)}</span>` : ''}
+                  ${ex.rpe ? `<span class="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-medium border border-slate-200">RPE ${ex.rpe}</span>` : ''}
+                </div>
+                ${lastPerfHtml}
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1 shrink-0">
+              <button onclick="toggleExerciseFeedbackPanel(${idx})" title="Registrar Feedback y Series" class="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center">
+                <i class="fa-solid fa-sliders"></i>
+              </button>
+              <button onclick="openEditExerciseModal(${idx})" title="Editar" class="text-slate-400 hover:text-slate-700 w-7 h-7 rounded-lg transition flex items-center justify-center">
+                <i class="fa-solid fa-pen-to-square text-xs"></i>
+              </button>
+              <button onclick="promptDeleteExercise(${idx})" title="Eliminar" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition flex items-center justify-center">
+                <i class="fa-solid fa-trash-can text-xs"></i>
+              </button>
+            </div>
+          </div>
+
+          ${isFeedbackOpen ? `
+            <div class="bg-slate-50 border-t border-slate-200 p-3 space-y-2.5 text-xs">
+              <div class="font-bold text-slate-700 flex justify-between items-center text-[11px]">
+                <span><i class="fa-solid fa-clipboard-check text-indigo-600 mr-1"></i> Feedback: ${escapeHtml(ex.name)}</span>
+                <button onclick="toggleExerciseFeedbackPanel(${idx})" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+
+              <!-- Registro por Serie -->
+              <div class="bg-white border border-slate-200 rounded-xl p-2.5 space-y-2">
+                <div class="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  <span>Registro Serie por Serie</span>
+                  <span>${ex.type === 'time' ? 'Segundos' : 'Carga × Reps'}</span>
+                </div>
+                <div class="space-y-1.5">
+                  ${(ex.setsLog || []).map((s, sIdx) => `
+                    <div class="flex items-center gap-2 bg-slate-50/80 p-1.5 rounded-lg border border-slate-200/80">
+                      <span class="text-[10px] font-bold text-slate-500 w-12 shrink-0">S${sIdx + 1}</span>
+                      <div class="flex-1 flex items-center gap-1.5">
+                        <div class="relative flex-1">
+                          <input type="number" step="0.5" id="setWeight_${idx}_${sIdx}" value="${s.weight ?? currentWeight}" 
+                            class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 text-center"
+                            placeholder="${ex.type === 'time' ? 'Seg' : 'Kg'}">
+                          <span class="absolute right-1.5 top-1.5 text-[9px] text-slate-400 pointer-events-none">${ex.type === 'time' ? 's' : 'kg'}</span>
+                        </div>
+                        <span class="text-slate-400 text-xs">×</span>
+                        <div class="relative flex-1">
+                          <input type="number" id="setReps_${idx}_${sIdx}" value="${s.reps ?? ex.reps}" 
+                            class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 text-center"
+                            placeholder="Reps">
+                          <span class="absolute right-1.5 top-1.5 text-[9px] text-slate-400 pointer-events-none">${ex.type === 'time' ? 's' : 'reps'}</span>
+                        </div>
+                      </div>
+                      <label class="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-300 cursor-pointer shrink-0">
+                        <input type="checkbox" id="setDone_${idx}_${sIdx}" ${s.done ? 'checked' : ''} class="w-3.5 h-3.5 text-emerald-600 rounded">
+                        <span class="text-[10px] font-semibold text-slate-600">Hecha</span>
+                      </label>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Estado</label>
+                  <select id="exStatus_${idx}" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+                    <option value="completed" ${ex.status === 'completed' ? 'selected' : ''}>✅ Realizado</option>
+                    <option value="skipped" ${ex.status === 'skipped' ? 'selected' : ''}>❌ Omitido</option>
+                    <option value="pending" ${ex.status === 'pending' ? 'selected' : ''}>⏳ Pendiente</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Sensación</label>
+                  <select id="exSensation_${idx}" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+                    <option value="Ligera" ${ex.sensation === 'Ligera' ? 'selected' : ''}>🟢 Ligera (+ Carga)</option>
+                    <option value="Adecuada" ${(!ex.sensation || ex.sensation === 'Adecuada') ? 'selected' : ''}>🔵 Adecuada (Óptimo)</option>
+                    <option value="Muy Pesada" ${ex.sensation === 'Muy Pesada' ? 'selected' : ''}>🟡 Muy Pesada (Mantener)</option>
+                    <option value="Fallo" ${ex.sensation === 'Fallo' ? 'selected' : ''}>🔴 Fallo (Descargar)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Escala RPE</label>
+                  <select id="exRPE_${idx}" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+                    <option value="6-7" ${ex.rpe === '6-7' ? 'selected' : ''}>RPE 6-7 (3-4 reps en reserva)</option>
+                    <option value="8" ${(!ex.rpe || ex.rpe === '8') ? 'selected' : ''}>RPE 8 (2 reps en reserva)</option>
+                    <option value="9" ${ex.rpe === '9' ? 'selected' : ''}>RPE 9 (1 rep en reserva)</option>
+                    <option value="10" ${ex.rpe === '10' ? 'selected' : ''}>RPE 10 (Fallo absoluto)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[10px] font-semibold text-slate-500 mb-0.5">Notas / Sensaciones</label>
+                <input type="text" id="exNotes_${idx}" value="${escapeHtml(ex.notes || '')}" placeholder="Sensaciones..." 
+                  class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800">
+              </div>
+
+              <div class="flex justify-end pt-0.5">
+                <button onclick="saveIndividualFeedback(${idx})" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3 py-1 rounded-lg text-xs shadow-sm transition">
+                  Guardar Feedback
+                </button>
+              </div>
+            </div>
+          ` : ''}
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    function toggleExerciseLock(idx) {
+      const session = getActiveSession();
+      if (!session || !session.exercises[idx]) return;
+      session.exercises[idx].isLocked = !session.exercises[idx].isLocked;
+      saveMainState();
+    }
+
+    function toggleExerciseStatus(index) {
+      const session = getActiveSession();
+      if (!session || !session.exercises[index]) return;
+      const current = session.exercises[index].status;
+      if (current === 'pending') {
+        session.exercises[index].status = 'completed';
+        if (session.exercises[index].setsLog) {
+          session.exercises[index].setsLog.forEach(s => s.done = true);
+        }
+      } else if (current === 'completed') {
+        session.exercises[index].status = 'skipped';
+        if (session.exercises[index].setsLog) {
+          session.exercises[index].setsLog.forEach(s => s.done = false);
+        }
+      } else {
+        session.exercises[index].status = 'pending';
+        if (session.exercises[index].setsLog) {
+          session.exercises[index].setsLog.forEach(s => s.done = false);
+        }
+      }
+      saveMainState();
+    }
+
+    function toggleExerciseFeedbackPanel(idx) {
+      openFeedbackIndex = openFeedbackIndex === idx ? null : idx;
+      renderActiveSession();
+    }
+
+    function saveIndividualFeedback(idx) {
+      const session = getActiveSession();
+      if (!session || !session.exercises[idx]) return;
+      const ex = session.exercises[idx];
+
+      ex.status = document.getElementById(`exStatus_${idx}`).value;
+      ex.sensation = document.getElementById(`exSensation_${idx}`).value;
+      ex.rpe = document.getElementById(`exRPE_${idx}`).value;
+      ex.notes = document.getElementById(`exNotes_${idx}`).value.trim();
+
+      if (ex.setsLog && Array.isArray(ex.setsLog)) {
+        ex.setsLog.forEach((s, sIdx) => {
+          const wInput = document.getElementById(`setWeight_${idx}_${sIdx}`);
+          const rInput = document.getElementById(`setReps_${idx}_${sIdx}`);
+          const doneInput = document.getElementById(`setDone_${idx}_${sIdx}`);
+          if (wInput) s.weight = parseFloat(wInput.value) || 0;
+          if (rInput) s.reps = parseInt(rInput.value) || 0;
+          if (doneInput) s.done = doneInput.checked;
+        });
+
+        if (ex.setsLog.some(s => s.done) && ex.status === 'pending') {
+          ex.status = 'completed';
+        }
+      }
+
+      openFeedbackIndex = null;
+      saveMainState();
+      showToast("Feedback actualizado", "success");
+    }
+
+    function handleCatalogSearch(queryStr) {
+      const dropdown = document.getElementById('catalogAutocompleteDropdown');
+      const val = queryStr.trim().toLowerCase();
+      if (!val) {
+        dropdown.classList.add('hidden');
+        return;
+      }
+
+      const matches = allowedCatalog.filter(c => 
+        c.name.toLowerCase().includes(val) || c.group.toLowerCase().includes(val)
+      );
+
+      if (matches.length === 0) {
+        dropdown.innerHTML = `<div class="p-2 text-slate-400 text-[11px] text-center">No encontrado en el catálogo permitido</div>`;
+        dropdown.classList.remove('hidden');
+        return;
+      }
+
+      dropdown.innerHTML = '';
+      matches.forEach(item => {
+        const option = document.createElement('div');
+        option.className = "p-2 hover:bg-indigo-50 cursor-pointer rounded-lg flex justify-between items-center";
+        option.innerHTML = `
+          <div>
+            <div class="font-bold text-slate-800 flex items-center gap-1.5">
+              <span>${escapeHtml(item.name)}</span>
+              ${item.syncWeights ? `<span class="text-[9px] text-indigo-600 bg-indigo-50 px-1 rounded font-normal"><i class="fa-solid fa-link"></i> Mismo peso</span>` : ''}
+            </div>
+            <div class="text-[10px] text-slate-500">${item.group} • ${item.defaultSets}×${item.defaultReps} • Tempo: ${item.tempo || 'N/A'}</div>
+          </div>
+          <div class="text-right text-[10px] font-semibold text-indigo-600">
+            CEN: ${item.weights?.CEN || 0}kg / POL: ${item.weights?.POL || 0}kg
+          </div>
+        `;
+        option.onclick = () => selectCatalogItemIntoModal(item);
+        dropdown.appendChild(option);
+      });
+      dropdown.classList.remove('hidden');
+    }
+
+    function selectCatalogItemIntoModal(item) {
+      document.getElementById('modalExName').value = item.name;
+      document.getElementById('modalExGroup').value = item.group;
+      document.getElementById('modalExType').value = item.type || 'reps';
+      document.getElementById('modalExSets').value = item.defaultSets || 3;
+      document.getElementById('modalExReps').value = item.defaultReps || 10;
+      document.getElementById('modalExTempo').value = item.tempo || '3-1-1-0';
+      document.getElementById('modalExWeightCen').value = item.weights?.CEN ?? 0;
+      document.getElementById('modalExWeightPol').value = item.weights?.POL ?? (item.weights?.CEN ?? 0);
+      document.getElementById('modalExSyncWeights').checked = item.syncWeights ?? true;
+
+      updateExMeasureLabel();
+      document.getElementById('catalogAutocompleteDropdown').classList.add('hidden');
+
+      const alertBox = document.getElementById('autoLoadedAlert');
+      const alertText = document.getElementById('autoLoadedAlertText');
+      alertText.textContent = `Cargado: ${item.name} (${item.weights?.CEN || 0}kg CEN / ${item.weights?.POL || 0}kg POL)`;
+      alertBox.classList.remove('hidden');
+      setTimeout(() => alertBox.classList.add('hidden'), 3500);
+    }
+
+    function updateExMeasureLabel() {
+      const type = document.getElementById('modalExType').value;
+      const lbl = document.getElementById('lblModalExReps');
+      if (lbl) lbl.textContent = type === 'time' ? 'Segundos Meta' : 'Reps Meta';
+    }
+
+    function setTempoPreset(preset) {
+      document.getElementById('modalExTempo').value = preset;
+    }
+
+    function onModalWeightChanged(source, val) {
+      const isSync = document.getElementById('modalExSyncWeights').checked;
+      if (isSync) {
+        if (source === 'CEN') {
+          document.getElementById('modalExWeightPol').value = val;
+        } else {
+          document.getElementById('modalExWeightCen').value = val;
+        }
+      }
+    }
+
+    function handleModalSyncWeightsToggle(checked) {
+      if (checked) {
+        const cenVal = document.getElementById('modalExWeightCen').value;
+        document.getElementById('modalExWeightPol').value = cenVal;
+      }
+    }
+
+    function openAddExerciseModal() {
+      document.getElementById('exerciseModalTitle').textContent = 'Añadir Ejercicio';
+      document.getElementById('editExerciseId').value = '';
+      document.getElementById('modalExName').value = '';
+      document.getElementById('modalExSets').value = '3';
+      document.getElementById('modalExReps').value = '10';
+      document.getElementById('modalExWeightCen').value = '0';
+      document.getElementById('modalExWeightPol').value = '0';
+      document.getElementById('modalExSyncWeights').checked = true;
+      document.getElementById('modalExTempo').value = '3-1-1-0';
+      document.getElementById('modalExType').value = 'reps';
+      document.getElementById('modalExLocked').checked = false;
+      document.getElementById('autoLoadedAlert').classList.add('hidden');
+      document.getElementById('catalogAutocompleteDropdown').classList.add('hidden');
+      updateExMeasureLabel();
+      document.getElementById('exerciseModal').classList.remove('hidden');
+    }
+
+    function openEditExerciseModal(idx) {
+      const session = getActiveSession();
+      if (!session || !session.exercises[idx]) return;
+      const ex = session.exercises[idx];
+
+      document.getElementById('exerciseModalTitle').textContent = 'Editar Ejercicio';
+      document.getElementById('editExerciseId').value = ex.id;
+      document.getElementById('modalExName').value = ex.name;
+      document.getElementById('modalExGroup').value = ex.group || 'Pecho';
+      document.getElementById('modalExType').value = ex.type || 'reps';
+      document.getElementById('modalExSets').value = ex.sets;
+      document.getElementById('modalExReps').value = ex.reps;
+      
+      const wCen = ex.weights?.CEN ?? ex.weight ?? 0;
+      const wPol = ex.weights?.POL ?? ex.weight ?? 0;
+      document.getElementById('modalExWeightCen').value = wCen;
+      document.getElementById('modalExWeightPol').value = wPol;
+      document.getElementById('modalExSyncWeights').checked = ex.syncWeights ?? (wCen === wPol);
+
+      document.getElementById('modalExTempo').value = ex.tempo || '3-1-1-0';
+      document.getElementById('modalExLocked').checked = !!ex.isLocked;
+      document.getElementById('autoLoadedAlert').classList.add('hidden');
+      document.getElementById('catalogAutocompleteDropdown').classList.add('hidden');
+
+      updateExMeasureLabel();
+      document.getElementById('exerciseModal').classList.remove('hidden');
+    }
+
+    function closeExerciseModal() {
+      document.getElementById('exerciseModal').classList.add('hidden');
+    }
+
+    const formEl = document.getElementById('exerciseForm');
+    if (formEl) {
+      formEl.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const session = getActiveSession();
+        if (!session) return;
+
+        const editId = document.getElementById('editExerciseId').value;
+        const name = document.getElementById('modalExName').value.trim();
+        const group = document.getElementById('modalExGroup').value;
+        const type = document.getElementById('modalExType').value;
+        const sets = parseInt(document.getElementById('modalExSets').value);
+        const reps = parseInt(document.getElementById('modalExReps').value);
+        let weightCen = parseFloat(document.getElementById('modalExWeightCen').value) || 0;
+        let weightPol = parseFloat(document.getElementById('modalExWeightPol').value) || 0;
+        const syncWeights = document.getElementById('modalExSyncWeights').checked;
+        if (syncWeights) {
+          weightPol = weightCen;
+        }
+
+        const tempo = document.getElementById('modalExTempo').value.trim();
+        const isLocked = document.getElementById('modalExLocked').checked;
+
+        if (!editId) {
+          const newExId = "ex_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
+          const newEx = {
+            id: newExId,
+            name, group, type, sets, reps,
+            weights: { CEN: weightCen, POL: weightPol },
+            syncWeights: syncWeights,
+            tempo, isLocked,
+            status: 'pending',
+            sensation: 'Adecuada',
+            rpe: '8',
+            notes: ''
+          };
+          ensureExerciseSetsLog(newEx);
+          session.exercises.push(newEx);
+        } else {
+          const target = session.exercises.find(ex => ex.id === editId);
+          if (target) {
+            target.name = name;
+            target.group = group;
+            target.type = type;
+            target.sets = sets;
+            target.reps = reps;
+            target.weights = { CEN: weightCen, POL: weightPol };
+            target.syncWeights = syncWeights;
+            target.tempo = tempo;
+            target.isLocked = isLocked;
+            ensureExerciseSetsLog(target);
+            syncUnfinishedSetsToPlan(target);
+          }
+        }
+
+        closeExerciseModal();
+        saveMainState();
+      });
+    }
+
+    function promptDeleteExercise(idx) {
+      exerciseToDeleteIndex = idx;
+      document.getElementById('deleteConfirmModal').classList.remove('hidden');
+    }
+
+    function closeDeleteConfirmModal() {
+      exerciseToDeleteIndex = null;
+      document.getElementById('deleteConfirmModal').classList.add('hidden');
+    }
+
+    function confirmDeleteExercise() {
+      const session = getActiveSession();
+      if (session && exerciseToDeleteIndex !== null) {
+        session.exercises.splice(exerciseToDeleteIndex, 1);
+        openFeedbackIndex = null;
+        saveMainState();
+      }
+      closeDeleteConfirmModal();
+    }
+
+    async function completeCurrentWorkoutSession() {
+      if (!currentUser || !db) {
+        showToast("Inicia sesión para guardar entrenamientos.", "info");
+        toggleLoginModal();
+        return;
+      }
+
+      const session = getActiveSession();
+      if (!session) return;
+
+      const completedCount = session.exercises.filter(e => e.status === 'completed').length;
+      if (completedCount === 0) {
+        showToast("Marca al menos un ejercicio como realizado antes de guardar.", "error");
+        return;
+      }
+
+      const localDate = getLocalDateString(new Date());
+      const now = new Date();
+      session.lastCompleted = now.toISOString();
+
+      let volume = 0;
+      session.exercises.forEach(ex => {
+        if (ex.type !== 'time') {
+          if (ex.setsLog && Array.isArray(ex.setsLog)) {
+            const doneSets = ex.setsLog.filter(s => s.done);
+            if (doneSets.length > 0) {
+              doneSets.forEach(s => {
+                volume += (Number(s.weight) || 0) * (Number(s.reps) || 0);
+              });
+            } else if (ex.status === 'completed') {
+              const w = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
+              volume += (ex.sets * ex.reps * w);
+            }
+          } else if (ex.status === 'completed') {
+            const w = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
+            volume += (ex.sets * ex.reps * w);
+          }
+        }
+      });
+
+      const logData = {
+        sessionName: session.name,
+        localDate: localDate,
+        createdAt: now.toISOString(),
+        location: activeGymLocation,
+        exercisesCount: session.exercises.length,
+        completedCount: completedCount,
+        volume: volume,
+        exercisesDetail: session.exercises.map(e => ({
+          id: e.id || null,
+          name: e.name,
+          group: e.group || null,
+          type: e.type || 'reps',
+          sets: e.sets,
+          reps: e.reps,
+          weight: (e.weights && e.weights[activeGymLocation] !== undefined) ? e.weights[activeGymLocation] : (e.weight || 0),
+          rpe: e.rpe || '8',
+          sensation: e.sensation || 'Adecuada',
+          notes: e.notes || '',
+          status: e.status,
+          setsDetail: (e.setsLog && Array.isArray(e.setsLog)) ? e.setsLog.map(s => ({
+            weight: Number(s.weight) || 0,
+            reps: Number(s.reps) || 0,
+            done: !!s.done
+          })) : null
+        }))
+      };
+
+      try {
+        const logsCollRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs');
+        await addDoc(logsCollRef, logData);
+
+        session.exercises.forEach(ex => {
+          ex.status = 'pending';
+          ex.sensation = 'Adecuada';
+          ex.rpe = '8';
+          ex.notes = '';
+          if (ex.setsLog && Array.isArray(ex.setsLog)) {
+            ex.setsLog.forEach(s => s.done = false);
+          }
+        });
+
+        saveMainState();
+        showToast("¡Entrenamiento guardado con éxito!", "success");
+      } catch (err) {
+        showToast("Error al guardar: " + err.message, "error");
+      }
+    }
+
+    function openExtraActivityModal() {
+      document.getElementById('extraActivityModal').classList.remove('hidden');
+    }
+
+    function closeExtraActivityModal() {
+      document.getElementById('extraActivityModal').classList.add('hidden');
+    }
+
+    async function saveExtraActivity() {
+      if (!currentUser || !db) {
+        showToast("Inicia sesión para registrar actividades.", "info");
+        toggleLoginModal();
+        return;
+      }
+
+      const name = document.getElementById('extraActivityName').value.trim() || 'Actividad Deportiva';
+      const fatigue = document.getElementById('extraActivityFatigue').value;
+      const notes = document.getElementById('extraActivityNotes').value.trim();
+      const localDate = getLocalDateString(new Date());
+
+      const activityData = {
+        sessionName: `Extra: ${name}`,
+        localDate: localDate,
+        createdAt: new Date().toISOString(),
+        isExtraActivity: true,
+        activityType: name,
+        fatigueLevel: fatigue,
+        notes: notes
+      };
+
+      try {
+        const logsCollRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs');
+        await addDoc(logsCollRef, activityData);
+        closeExtraActivityModal();
+        showToast(`¡${name} registrada! La IA adaptará la fatiga.`, "success");
+      } catch (err) {
+        showToast("Error: " + err.message, "error");
+      }
+    }
+
+    function openPlanWeekModal() {
+      if (!currentUser || !geminiApiKey) {
+        showToast("Inicia sesión para usar el planificador IA.", "info");
+        toggleLoginModal();
+        return;
+      }
+      selectPlanDays(targetWeekDays);
+      document.getElementById('planWeekModal').classList.remove('hidden');
+    }
+
+    function closePlanWeekModal() {
+      document.getElementById('planWeekModal').classList.add('hidden');
+    }
+
+    function selectPlanDays(days) {
+      targetWeekDays = days;
+      [2, 3, 4, 5].forEach(d => {
+        const btn = document.getElementById(`planDayBtn_${d}`);
+        if (btn) {
+          if (d === days) {
+            btn.className = "plan-day-btn py-2.5 rounded-xl border border-indigo-600 bg-indigo-50 font-bold text-indigo-600 transition shadow-sm";
+          } else {
+            btn.className = "plan-day-btn py-2.5 rounded-xl border border-slate-200 font-bold hover:border-indigo-600 text-slate-700 transition";
+          }
+        }
+      });
+    }
+
+    async function executePlanWeekAnalysis() {
+      closePlanWeekModal();
+      const btn = document.getElementById('btnAnalyze');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Reestructurando semana (${targetWeekDays} días) con Gemini...`;
+
+      const recentExtras = workoutLogs.filter(l => l.isExtraActivity).slice(0, 5);
+      const recentGymLogs = workoutLogs.filter(l => !l.isExtraActivity).slice(0, 8);
+      const availableCatalogForGym = allowedCatalog.filter(c => activeGymLocation === 'CEN' ? c.inCen : c.inPol);
+
+      const lockedExercises = [];
+      workoutSessions.forEach(sess => {
+        if (sess.exercises) {
+          sess.exercises.forEach(e => {
+            if (e.isLocked) lockedExercises.push({ name: e.name, group: e.group, sets: e.sets, reps: e.reps, weights: e.weights, syncWeights: e.syncWeights });
+          });
+        }
+      });
+
+      const prompt = `Actúa como un entrenador de fuerza de élite y periodizador de hipertrofia.
+El usuario quiere estructurar su semana de entrenamiento para EXACTAMENTE ${targetWeekDays} DÍAS (sesiones).
+Sede activa: "${activeGymLocation}".
+
+REGLAS CRÍTICAS DE PLANIFICACIÓN:
+1. Debes generar un plan con EXACTAMENTE ${targetWeekDays} sesiones (un array de ${targetWeekDays} objetos en "sessions").
+   - 2 días: Ej. Full Body A, Full Body B o Torso / Pierna.
+   - 3 días: Ej. Push, Pull, Legs o Full Body 3 días.
+   - 4 días: Ej. Torso, Pierna, Torso, Pierna o Upper/Lower/Push/Pull.
+   - 5 días: Ej. Push, Pull, Legs, Upper, Lower o Torso, Pierna, Push, Pull, Brazos/Core.
+2. Cada sesión debe contener entre 4 y 7 ejercicios equilibrados.
+3. TODOS los ejercicios deben provenir EXCLUSIVAMENTE del catálogo disponible proporcionado abajo. Está terminantemente prohibido sugerir ejercicios fuera del catálogo.
+4. Ejercicios bloqueados por el usuario (OBLIGATORIO incluirlos en alguna de las sesiones respetando sus características): ${JSON.stringify(lockedExercises)}.
+5. Si un ejercicio tiene syncWeights=true o es de peso libre, su progresión de carga es idéntica para ambas sedes.
+6. Historial de gimnasio: ${JSON.stringify(recentGymLogs)}.
+7. Fatiga y deportes extra: ${JSON.stringify(recentExtras)}.
+8. Catálogo permitido para esta sede: ${JSON.stringify(availableCatalogForGym)}.
+
+Responde ÚNICAMENTE con un JSON con esta estructura exacta:
+{
+  "phaseExplanation": "Explicación táctica del bloque (acumulación/sobrecarga/descarga) y cómo se estructuran los ${targetWeekDays} días",
+  "sessions": [
+    {
+      "name": "Día 1: Torso Pesado",
+      "exercises": [
+        {
+          "name": "Nombre exacto del catálogo",
+          "sets": 4,
+          "reps": 8,
+          "weight": 60,
+          "tempo": "3-1-1-0",
+          "notes": "Foco en control"
+        }
+      ]
+    }
+  ]
+}`;
+
+      const key = String(geminiApiKey).trim();
+      const apiUrl = geminiUrl(key);
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          })
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        let rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+        const parsed = JSON.parse(rawText);
+
+        renderAiProposal(parsed);
+      } catch (err) {
+        console.error("Error Head Coach Gemini:", err);
+        showToast("No se pudo completar el análisis: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> Planificar Semana & Periodización (Head Coach IA)`;
+      }
+    }
+
+    function renderAiProposal(proposal) {
+      pendingAiProposal = proposal;
+      const box = document.getElementById('aiSuggestionBox');
+      const textEl = document.getElementById('aiSuggestionText');
+      const tag = document.getElementById('aiSuggestionGymTag');
+      const container = document.getElementById('aiChangesContainer');
+
+      tag.textContent = `Sede ${activeGymLocation} (${proposal.sessions ? proposal.sessions.length : targetWeekDays} días)`;
+      textEl.textContent = proposal.phaseExplanation || "Propuesta de periodización calculada.";
+      container.innerHTML = '';
+
+      if (proposal.sessions && Array.isArray(proposal.sessions)) {
+        proposal.sessions.forEach((s, sIdx) => {
+          const sessDiv = document.createElement('div');
+          sessDiv.className = "bg-white/80 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1.5";
+          
+          let exercisesHtml = (s.exercises || []).map(e => {
+            return `<div class="flex justify-between items-center text-[11px] py-0.5 border-b border-slate-100 last:border-0">
+              <span class="font-semibold text-slate-800">${escapeHtml(e.name)}</span>
+              <span class="text-indigo-600 font-bold">${e.sets}×${e.reps} • ${e.weight}kg</span>
+            </div>`;
+          }).join('');
+
+          sessDiv.innerHTML = `
+            <div class="font-bold text-amber-900 flex justify-between items-center">
+              <span>📅 ${escapeHtml(s.name)}</span>
+              <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">${(s.exercises || []).length} ejercicios</span>
+            </div>
+            <div class="space-y-0.5 pl-1.5">
+              ${exercisesHtml}
+            </div>
+          `;
+          container.appendChild(sessDiv);
+        });
+      }
+
+      box.classList.remove('hidden');
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+    }
+
+    function dismissAiSuggestion() {
+      pendingAiProposal = null;
+      document.getElementById('aiSuggestionBox').classList.add('hidden');
+    }
+
+    function applySelectedAiSuggestions() {
+      if (!pendingAiProposal || !pendingAiProposal.sessions || !Array.isArray(pendingAiProposal.sessions)) {
+        dismissAiSuggestion();
+        return;
+      }
+
+      const newSessions = [];
+
+      pendingAiProposal.sessions.forEach((propSess, sIdx) => {
+        const sessionObj = {
+          id: "sess_" + Date.now() + "_" + sIdx,
+          name: propSess.name || `Día ${sIdx + 1}`,
+          lastCompleted: null,
+          exercises: []
+        };
+
+        (propSess.exercises || []).forEach(propEx => {
+          const catItem = allowedCatalog.find(c => c.name.toLowerCase() === propEx.name.toLowerCase());
+          
+          let wCen = propEx.weight || 0;
+          let wPol = propEx.weight || 0;
+          let isSync = true;
+
+          if (catItem) {
+            isSync = catItem.syncWeights ?? true;
+            if (isSync) {
+              wCen = propEx.weight ?? catItem.weights?.[activeGymLocation] ?? 0;
+              wPol = wCen;
+            } else {
+              if (activeGymLocation === 'CEN') {
+                wCen = propEx.weight ?? catItem.weights?.CEN ?? 0;
+                wPol = catItem.weights?.POL ?? wCen;
+              } else {
+                wPol = propEx.weight ?? catItem.weights?.POL ?? 0;
+                wCen = catItem.weights?.CEN ?? wPol;
+              }
+            }
+          }
+
+          const exObj = {
+            id: "ex_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+            name: catItem ? catItem.name : propEx.name,
+            group: catItem ? catItem.group : "General",
+            type: catItem ? (catItem.type || 'reps') : 'reps',
+            sets: propEx.sets || (catItem ? catItem.defaultSets : 3),
+            reps: propEx.reps || (catItem ? catItem.defaultReps : 10),
+            weights: { CEN: wCen, POL: wPol },
+            syncWeights: isSync,
+            tempo: propEx.tempo || (catItem ? catItem.tempo : "3-1-1-0"),
+            isLocked: false,
+            status: 'pending',
+            sensation: 'Adecuada',
+            rpe: '8',
+            notes: propEx.notes || ''
+          };
+
+          ensureExerciseSetsLog(exObj);
+          syncUnfinishedSetsToPlan(exObj);
+          if (exObj.setsLog && Array.isArray(exObj.setsLog)) {
+            exObj.setsLog.forEach(s => s.done = false);
+          }
+
+          sessionObj.exercises.push(exObj);
+        });
+
+        newSessions.push(sessionObj);
+      });
+
+      workoutSessions = newSessions;
+      activeSessionIndex = 0;
+
+      dismissAiSuggestion();
+      saveMainState();
+      showToast(`¡Plan semanal de ${workoutSessions.length} días aplicado con éxito!`, "success");
+    }
+
+    async function sendCoachQuery() {
+      if (!currentUser || !geminiApiKey) {
+        showToast("Inicia sesión para hablar con el Coach IA.", "info");
+        toggleLoginModal();
+        return;
+      }
+
+      const input = document.getElementById('coachPromptInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const chatLog = document.getElementById('coachChatLog');
+      const userBubble = document.createElement('div');
+      userBubble.className = "bg-indigo-600 text-white p-2.5 rounded-xl ml-6 text-right leading-relaxed font-medium";
+      userBubble.textContent = text;
+      chatLog.appendChild(userBubble);
+
+      input.value = '';
+      chatLog.scrollTop = chatLog.scrollHeight;
+
+      const loadingBubble = document.createElement('div');
+      loadingBubble.className = "bg-slate-200 text-slate-600 p-2.5 rounded-xl mr-6 leading-relaxed flex items-center gap-2";
+      loadingBubble.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo-600"></i> Pensando...`;
+      chatLog.appendChild(loadingBubble);
+      chatLog.scrollTop = chatLog.scrollHeight;
+
+      const session = getActiveSession();
+      const prompt = `Eres un entrenador personal certificado. Sede "${activeGymLocation}". Sesión: ${JSON.stringify(session)}. Pregunta: "${text}"`;
+
+      const key = String(geminiApiKey).trim();
+      const apiUrl = geminiUrl(key);
+
+      try {
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        const reply = result.candidates?.[0]?.content?.parts?.[0]?.text || "No pude generar respuesta.";
+
+        chatLog.removeChild(loadingBubble);
+        const aiBubble = document.createElement('div');
+        aiBubble.className = "bg-white border border-slate-200 text-slate-800 p-3 rounded-xl mr-6 leading-relaxed shadow-sm whitespace-pre-line";
+        aiBubble.textContent = reply;
+        chatLog.appendChild(aiBubble);
+      } catch (err) {
+        if (loadingBubble.parentNode) chatLog.removeChild(loadingBubble);
+        const errBubble = document.createElement('div');
+        errBubble.className = "bg-rose-50 text-rose-700 p-2.5 rounded-xl text-xs";
+        errBubble.textContent = "Error al conectar: " + err.message;
+        chatLog.appendChild(errBubble);
+      } finally {
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+    }
+
+    function openSettingsModal() {
+      renderCatalogSettings();
+      document.getElementById('settingsModal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settingsModal').classList.add('hidden');
+    }
+
+    function renderCatalogSettings() {
+      const container = document.getElementById('catalogList');
+      if (!container) return;
+      container.innerHTML = '';
+
+      allowedCatalog.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = "p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs";
+        row.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-slate-800 truncate flex items-center gap-1.5">
+                <span>${escapeHtml(item.name)}</span>
+                ${item.syncWeights ? `<span title="Mismo peso en CEN y POL" class="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-semibold"><i class="fa-solid fa-link mr-0.5"></i>Sync</span>` : ''}
+              </div>
+              <div class="text-[10px] text-slate-500">${item.group} • ${item.defaultSets}×${item.defaultReps} • CEN: ${item.weights?.CEN || 0}kg / POL: ${item.weights?.POL || 0}kg</div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.inCen ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'}">CEN</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.inPol ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'}">POL</span>
+              <button onclick="removeCatalogItem(${idx})" class="text-slate-400 hover:text-rose-600 p-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[10px]">
+            <label class="flex items-center gap-1 text-slate-600 cursor-pointer">
+              <input type="checkbox" ${item.syncWeights ? 'checked' : ''} onchange="toggleCatalogItemSync(${idx}, this.checked)" class="w-3 h-3 text-indigo-600 rounded">
+              <span>Sincronizar peso en ambas sedes (peso libre)</span>
+            </label>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function toggleCatalogItemSync(idx, isSync) {
+      if (!allowedCatalog[idx]) return;
+      allowedCatalog[idx].syncWeights = isSync;
+      if (isSync) {
+        const baseW = allowedCatalog[idx].weights?.CEN ?? allowedCatalog[idx].weights?.POL ?? 0;
+        allowedCatalog[idx].weights = { CEN: baseW, POL: baseW };
+      }
+      localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+      saveMainState();
+      renderCatalogSettings();
+    }
+
+    function onNewCatSyncToggled(isSync) {
+      if (isSync) {
+        const cenVal = document.getElementById('newCatWeightCen').value;
+        document.getElementById('newCatWeightPol').value = cenVal;
+      }
+    }
+
+    function onNewCatWeightChanged(source, val) {
+      const isSync = document.getElementById('newCatSyncWeights').checked;
+      if (isSync) {
+        if (source === 'CEN') {
+          document.getElementById('newCatWeightPol').value = val;
+        } else {
+          document.getElementById('newCatWeightCen').value = val;
+        }
+      }
+    }
+
+    function addCatalogItem() {
+      const name = document.getElementById('newCatName').value.trim();
+      const group = document.getElementById('newCatGroup').value;
+      const sets = parseInt(document.getElementById('newCatSets').value) || 3;
+      const reps = parseInt(document.getElementById('newCatReps').value) || 10;
+      let wCen = parseFloat(document.getElementById('newCatWeightCen').value) || 0;
+      let wPol = parseFloat(document.getElementById('newCatWeightPol').value) || 0;
+      const syncWeights = document.getElementById('newCatSyncWeights').checked;
+      if (syncWeights) {
+        wPol = wCen;
+      }
+      const inCen = document.getElementById('newCatCen').checked;
+      const inPol = document.getElementById('newCatPol').checked;
+
+      if (!name) return;
+
+      allowedCatalog.push({
+        id: "cat_" + Date.now(),
+        name, group, type: "reps",
+        defaultSets: sets, defaultReps: reps,
+        tempo: "3-1-1-0",
+        weights: { CEN: wCen, POL: wPol },
+        syncWeights: syncWeights,
+        inCen, inPol
+      });
+
+      localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+      document.getElementById('newCatName').value = '';
+      saveMainState();
+      renderCatalogSettings();
+      showToast("Ejercicio añadido al catálogo", "success");
+    }
+
+    function removeCatalogItem(idx) {
+      allowedCatalog.splice(idx, 1);
+      localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+      saveMainState();
+      renderCatalogSettings();
+    }
+
+    function toggleHistoryModal() {
+      const modal = document.getElementById('historyModal');
+      if (!modal) return;
+      if (modal.classList.contains('hidden')) {
+        renderCalendar();
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function changeCalendarMonth(delta) {
+      currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const year = currentCalendarDate.getFullYear();
+      const month = currentCalendarDate.getMonth();
+      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      
+      const label = document.getElementById('calendarMonthLabel');
+      if (label) label.textContent = `${monthNames[month]} ${year}`;
+
+      const grid = document.getElementById('calendarGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      const logsByDate = {};
+      workoutLogs.forEach(log => {
+        const dateKey = log.localDate || (log.createdAt ? getLocalDateString(new Date(log.createdAt)) : '');
+        if (dateKey) {
+          if (!logsByDate[dateKey]) logsByDate[dateKey] = [];
+          logsByDate[dateKey].push(log);
+        }
+      });
+
+      const firstDay = new Date(year, month, 1);
+      let startingDay = firstDay.getDay() - 1;
+      if (startingDay === -1) startingDay = 6;
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      for (let i = 0; i < startingDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = "h-8 bg-transparent";
+        grid.appendChild(empty);
+      }
+
+      const todayStr = getLocalDateString(new Date());
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateObj = new Date(year, month, day);
+        const dateStr = getLocalDateString(dateObj);
+
+        const hasLogs = !!logsByDate[dateStr];
+        const isSelected = selectedCalendarDateStr === dateStr;
+        const isToday = todayStr === dateStr;
+
+        const cell = document.createElement('button');
+        cell.className = `h-8 text-xs font-semibold rounded-xl flex flex-col items-center justify-center relative transition ${
+          isSelected 
+            ? 'bg-indigo-600 text-white shadow-md' 
+            : isToday 
+              ? 'bg-indigo-100 text-indigo-700 font-bold border border-indigo-200' 
+              : 'hover:bg-slate-100 text-slate-700'
+        }`;
+        cell.onclick = () => {
+          selectedCalendarDateStr = dateStr;
+          renderCalendar();
+        };
+        cell.innerHTML = `<span>${day}</span>`;
+        if (hasLogs) {
+          const dot = document.createElement('span');
+          dot.className = `w-1.5 h-1.5 rounded-full absolute bottom-1 ${isSelected ? 'bg-amber-300' : 'bg-indigo-600'}`;
+          cell.appendChild(dot);
+        }
+        grid.appendChild(cell);
+      }
+      renderDayLogs(selectedCalendarDateStr, logsByDate[selectedCalendarDateStr] || []);
+    }
+
+    function renderDayLogs(dateStr, logs) {
+      const container = document.getElementById('dayLogsContainer');
+      const title = document.getElementById('selectedDateTitle');
+      const badge = document.getElementById('selectedDateBadge');
+      if (!container || !title || !badge) return;
+
+      const [y, m, d] = dateStr.split('-');
+      const dObj = new Date(y, m - 1, d);
+      title.textContent = dObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+      badge.textContent = `${logs.length} ${logs.length === 1 ? 'registro' : 'registros'}`;
+      container.innerHTML = '';
+
+      if (logs.length === 0) {
+        container.innerHTML = `<p class="text-[11px] text-slate-400 py-2">Sin registros en esta fecha.</p>`;
+        return;
+      }
+
+      logs.forEach(log => {
+        const item = document.createElement('div');
+        item.className = "p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs";
+        if (log.isExtraActivity) {
+          item.innerHTML = `
+            <div class="flex justify-between font-bold text-amber-800">
+              <span>🏃 ${escapeHtml(log.sessionName)}</span>
+              <span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Fatiga: ${log.fatigueLevel}</span>
+            </div>
+            ${log.notes ? `<p class="text-[10px] text-slate-600 italic">"${escapeHtml(log.notes)}"</p>` : ''}
+          `;
+        } else {
+          item.innerHTML = `
+            <div class="flex justify-between font-bold text-slate-800">
+              <span>${escapeHtml(log.sessionName)} (${log.location || 'CEN'})</span>
+              <span class="text-indigo-600">${log.volume.toLocaleString()} kg</span>
+            </div>
+            <div class="text-[10px] text-slate-500 flex items-center gap-2">
+              <span>${log.completedCount}/${log.exercisesCount} ejercicios</span>
+              <span>•</span>
+              <span>${new Date(log.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          `;
+        }
+        container.appendChild(item);
+      });
+    }
+
+    function toggleLoginModal() {
+      const modal = document.getElementById('loginModal');
+      if (modal) modal.classList.toggle('hidden');
+    }
+
+    function toggleCoachModal() {
+      if (!currentUser) {
+        showToast("Inicia sesión para hablar con el Coach IA.", "info");
+        toggleLoginModal();
+        return;
+      }
+      const modal = document.getElementById('coachModal');
+      if (modal) modal.classList.toggle('hidden');
+    }
+
+    function openNewSessionModal() {
+      document.getElementById('newSessionNameInput').value = '';
+      document.getElementById('newSessionModal').classList.remove('hidden');
+    }
+
+    function closeNewSessionModal() {
+      document.getElementById('newSessionModal').classList.add('hidden');
+    }
+
+    function createNewSession() {
+      const name = document.getElementById('newSessionNameInput').value.trim();
+      if (!name) return;
+
+      workoutSessions.push({
+        id: "sess_" + Date.now(),
+        name,
+        lastCompleted: null,
+        exercises: []
+      });
+      activeSessionIndex = workoutSessions.length - 1;
+      closeNewSessionModal();
+      saveMainState();
+    }
+
+    async function performLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errBox = document.getElementById('authErrorMessage');
+      const btn = document.getElementById('btnLoginSubmit');
+
+      errBox.classList.add('hidden');
+      if (!email || !password) {
+        errBox.textContent = "Introduce correo y contraseña.";
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Accediendo...`;
+
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+        document.getElementById('loginPassword').value = '';
+        setTimeout(() => toggleLoginModal(), 400);
+      } catch (err) {
+        errBox.textContent = "Error: " + err.message;
+        errBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Iniciar Sesión</span>`;
+      }
+    }
+
+    async function performLogout() {
+      try {
+        await signOut(auth);
+        toggleLoginModal();
+      } catch (err) {
+        showToast("Error: " + err.message, "error");
+      }
+    }
+
+    // Funciones en window
+    window.setGymLocation = setGymLocation;
+    window.toggleLoginModal = toggleLoginModal;
+    window.performLogin = performLogin;
+    window.performLogout = performLogout;
+    window.toggleCoachModal = toggleCoachModal;
+    window.sendCoachQuery = sendCoachQuery;
+    window.openSettingsModal = openSettingsModal;
+    window.closeSettingsModal = closeSettingsModal;
+    window.addCatalogItem = addCatalogItem;
+    window.removeCatalogItem = removeCatalogItem;
+    window.toggleCatalogItemSync = toggleCatalogItemSync;
+    window.onNewCatSyncToggled = onNewCatSyncToggled;
+    window.onNewCatWeightChanged = onNewCatWeightChanged;
+    window.onModalWeightChanged = onModalWeightChanged;
+    window.handleModalSyncWeightsToggle = handleModalSyncWeightsToggle;
+    window.openExtraActivityModal = openExtraActivityModal;
+    window.closeExtraActivityModal = closeExtraActivityModal;
+    window.saveExtraActivity = saveExtraActivity;
+    window.openPlanWeekModal = openPlanWeekModal;
+    window.closePlanWeekModal = closePlanWeekModal;
+    window.selectPlanDays = selectPlanDays;
+    window.executePlanWeekAnalysis = executePlanWeekAnalysis;
+    window.toggleHistoryModal = toggleHistoryModal;
+    window.changeCalendarMonth = changeCalendarMonth;
+    window.openNewSessionModal = openNewSessionModal;
+    window.closeNewSessionModal = closeNewSessionModal;
+    window.createNewSession = createNewSession;
+    window.openAddExerciseModal = openAddExerciseModal;
+    window.openEditExerciseModal = openEditExerciseModal;
+    window.closeExerciseModal = closeExerciseModal;
+    window.handleCatalogSearch = handleCatalogSearch;
+    window.selectCatalogItemIntoModal = selectCatalogItemIntoModal;
+    window.setTempoPreset = setTempoPreset;
+    window.updateExMeasureLabel = updateExMeasureLabel;
+    window.toggleExerciseStatus = toggleExerciseStatus;
+    window.toggleExerciseLock = toggleExerciseLock;
+    window.toggleExerciseFeedbackPanel = toggleExerciseFeedbackPanel;
+    window.saveIndividualFeedback = saveIndividualFeedback;
+    window.promptDeleteExercise = promptDeleteExercise;
+    window.closeDeleteConfirmModal = closeDeleteConfirmModal;
+    window.confirmDeleteExercise = confirmDeleteExercise;
+    window.completeCurrentWorkoutSession = completeCurrentWorkoutSession;
+    window.dismissAiSuggestion = dismissAiSuggestion;
+    window.applySelectedAiSuggestions = applySelectedAiSuggestions;
+
+    window.toggleRestTimerBar = toggleRestTimerBar;
+    window.closeRestTimerBar = closeRestTimerBar;
+    window.setRestTimerPreset = setRestTimerPreset;
+    window.toggleRestTimerRunning = toggleRestTimerRunning;
+    window.showToast = showToast;
+
+    // Inicialización Firebase
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+
+      onAuthStateChanged(auth, async (user) => {
+        currentUser = user;
+        updateAuthUI(user);
+        if (user) {
+          document.getElementById('unauthenticatedCard').classList.add('hidden');
+          document.getElementById('authenticatedApp').classList.remove('hidden');
+          await loadGeminiApiKey();
+          attachFirestoreListeners(user.uid);
+        } else {
+          geminiApiKey = null;
+          workoutSessions = [];
+          workoutLogs = [];
+          if (unsubscribeMainState) { unsubscribeMainState(); unsubscribeMainState = null; }
+          if (unsubscribeLogs) { unsubscribeLogs(); unsubscribeLogs = null; }
+          document.getElementById('authenticatedApp').classList.add('hidden');
+          document.getElementById('unauthenticatedCard').classList.remove('hidden');
+          renderAll();
+        }
+      });
+    } catch (e) {
+      console.error("Error Firebase:", e);
+    }
+
+    async function loadGeminiApiKey() {
+      if (!db || !currentUser) return;
+      try {
+        const configDoc = await getDoc(doc(db, 'config', 'gemini'));
+        if (configDoc.exists()) {
+          geminiApiKey = (configDoc.data().apiKey || '').trim();
+        }
+      } catch (err) {
+        console.warn("Clave Gemini ausente:", err);
+      }
+    }
+
+    function updateAuthUI(user) {
+      const btn = document.getElementById('btnLoginIcon');
+      const icon = document.getElementById('userHeaderIcon');
+      const loggedInContent = document.getElementById('loggedInContent');
+      const loggedOutContent = document.getElementById('loggedOutContent');
+      const userEmailDisplay = document.getElementById('userEmailDisplay');
+      const errBox = document.getElementById('authErrorMessage');
+
+      if (errBox) errBox.classList.add('hidden');
+
+      if (user) {
+        if (btn) {
+          btn.classList.remove('bg-slate-100', 'text-slate-700');
+          btn.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-300');
+        }
+        if (icon) icon.className = "fa-solid fa-user-check text-xs";
+        if (loggedInContent) loggedInContent.classList.remove('hidden');
+        if (loggedOutContent) loggedOutContent.classList.add('hidden');
+        if (userEmailDisplay) userEmailDisplay.textContent = user.email || user.uid;
+      } else {
+        if (btn) {
+          btn.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-300');
+          btn.classList.add('bg-slate-100', 'text-slate-700');
+        }
+        if (icon) icon.className = "fa-solid fa-user text-xs";
+        if (loggedInContent) loggedInContent.classList.add('hidden');
+        if (loggedOutContent) loggedOutContent.classList.remove('hidden');
+      }
+    }
+
+    function attachFirestoreListeners(userId) {
+      if (!db || !userId) return;
+      if (unsubscribeMainState) unsubscribeMainState();
+      if (unsubscribeLogs) unsubscribeLogs();
+
+      const stateDocRef = doc(db, 'artifacts', appId, 'users', userId, 'userWorkouts', 'mainState');
+      unsubscribeMainState = onSnapshot(stateDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.sessions && Array.isArray(data.sessions)) {
+            workoutSessions = data.sessions;
+          }
+          if (data.allowedCatalog && Array.isArray(data.allowedCatalog)) {
+            allowedCatalog = data.allowedCatalog;
+            localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+          }
+          renderAll();
+        } else {
+          workoutSessions = [
+            {
+              id: "sess_empuje",
+              name: "Día 1: Empuje (Push)",
+              lastCompleted: null,
+              exercises: [
+                { id: "ex_press_banca", name: "Press de Banca Plano", group: "Pecho", isLocked: true, syncWeights: true, type: "reps", sets: 4, reps: 8, weights: { CEN: 60, POL: 60 }, tempo: "3-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+                { id: "ex_press_inc", name: "Press Inclinado Mancuernas", group: "Pecho", isLocked: false, syncWeights: true, type: "reps", sets: 3, reps: 10, weights: { CEN: 22, POL: 22 }, tempo: "2-0-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" },
+                { id: "ex_fondos", name: "Fondos en Paralelas", group: "Pecho", isLocked: false, syncWeights: true, type: "reps", sets: 3, reps: 10, weights: { CEN: 0, POL: 0 }, tempo: "2-1-1-0", status: "pending", sensation: "Adecuada", rpe: "8", notes: "" }
+              ]
+            }
+          ];
+          saveMainState();
+        }
+      });
+
+      const logsCollRef = collection(db, 'artifacts', appId, 'users', userId, 'workoutLogs');
+      const q = query(logsCollRef, orderBy('createdAt', 'desc'), limit(150));
+      unsubscribeLogs = onSnapshot(q, (snapshot) => {
+        workoutLogs = [];
+        snapshot.forEach((d) => {
+          workoutLogs.push({ id: d.id, ...d.data() });
+        });
+        renderCalendar();
+        renderActiveSession();
+      });
+    }
+
+    function saveMainState() {
+      if (db && currentUser) {
+        const stateDocRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'userWorkouts', 'mainState');
+        setDoc(stateDocRef, {
+          sessions: workoutSessions,
+          allowedCatalog: allowedCatalog,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(err => console.error("Error guardando:", err));
+      }
+      renderAll();
+    }
+
+    setGymLocation(activeGymLocation);
+    renderAll();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('SW Registrado'))
+        .catch((err) => console.warn('SW Error:', err));
+    }
+  </script>
+</body>
+</html>
