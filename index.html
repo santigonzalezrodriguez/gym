@@ -152,6 +152,9 @@
             <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Tus Sesiones</h2>
           </div>
           <div class="flex items-center gap-2">
+            <button onclick="openProgressModal()" title="Progreso y récords" class="text-xs font-semibold text-slate-600 hover:text-indigo-600 flex items-center bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition">
+              <i class="fa-solid fa-chart-line text-[11px]"></i>
+            </button>
             <button onclick="toggleHistoryModal()" class="text-xs font-semibold text-slate-600 hover:text-indigo-600 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-lg transition">
               <i class="fa-solid fa-clock-rotate-left text-[11px]"></i> Historial
             </button>
@@ -323,6 +326,14 @@
           </div>
           <div id="userEmailDisplay" class="font-mono text-[11px] text-slate-600 truncate"></div>
         </div>
+        <div class="pt-1 space-y-2">
+          <button onclick="exportBackupJson()" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-file-export"></i> Copia de seguridad (JSON)
+          </button>
+          <button onclick="exportHistoryCsv()" class="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-table"></i> Historial para Excel (CSV)
+          </button>
+        </div>
         <div class="pt-2">
           <button onclick="performLogout()" class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2 rounded-xl text-xs font-bold transition">
             Cerrar Sesión
@@ -430,11 +441,6 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2 pt-1">
-          <input type="checkbox" id="modalExLocked" class="w-4 h-4 text-indigo-600 rounded">
-          <label for="modalExLocked" class="text-xs text-slate-700 font-medium">🔒 Bloquear ejercicio (Inamovible para la IA)</label>
-        </div>
-
         <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
           <button type="button" onclick="closeExerciseModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
           <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Guardar</button>
@@ -508,7 +514,7 @@
         </p>
 
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-          <div class="font-bold text-slate-800 text-xs">Añadir Nuevo Ejercicio al Catálogo</div>
+          <div id="catFormTitle" class="font-bold text-slate-800 text-xs">Añadir Nuevo Ejercicio al Catálogo</div>
           <div class="grid grid-cols-2 gap-2">
             <input type="text" id="newCatName" placeholder="Nombre (ej. Press Mancuernas)" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800">
             <select id="newCatGroup" class="bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800">
@@ -528,18 +534,31 @@
             <input type="number" step="0.5" id="newCatWeightPol" placeholder="POL kg" oninput="onNewCatWeightChanged('POL', this.value)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
           </div>
           <div class="pt-1 space-y-1.5">
-            <label class="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 cursor-pointer">
-              <input type="checkbox" id="newCatSyncWeights" onchange="onNewCatSyncToggled(this.checked)" checked class="w-3.5 h-3.5 text-indigo-600 rounded">
-              <span>Mismo peso en CEN y POL (peso libre/mismo material)</span>
-            </label>
+            <div class="flex items-center gap-3 flex-wrap">
+              <label class="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 cursor-pointer">
+                <input type="checkbox" id="newCatSyncWeights" onchange="onNewCatSyncToggled(this.checked)" checked class="w-3.5 h-3.5 text-indigo-600 rounded">
+                <i class="fa-solid fa-rotate"></i>
+                <span>Sync</span>
+              </label>
+              <label class="flex items-center gap-1.5 text-[11px] font-bold text-amber-700 cursor-pointer">
+                <input type="checkbox" id="newCatLocked" class="w-3.5 h-3.5 text-amber-600 rounded">
+                <i class="fa-solid fa-lock"></i>
+                <span>Bloquear (inamovible para la IA)</span>
+              </label>
+            </div>
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-3">
                 <label class="flex items-center gap-1 text-[11px] font-medium"><input type="checkbox" id="newCatCen" checked> En CEN</label>
                 <label class="flex items-center gap-1 text-[11px] font-medium"><input type="checkbox" id="newCatPol" checked> En POL</label>
               </div>
-              <button onclick="addCatalogItem()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition">
-                + Añadir
-              </button>
+              <div class="flex items-center gap-1.5">
+                <button id="btnCancelCatEdit" onclick="cancelCatalogEdit()" class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold px-3 py-1 rounded-lg text-xs transition">
+                  Cancelar
+                </button>
+                <button id="btnAddCatalogItem" onclick="addCatalogItem()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1 rounded-lg text-xs transition">
+                  + Añadir
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -659,11 +678,75 @@
     </div>
   </div>
 
+  <!-- Modal Progreso -->
+  <div id="progressModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-3 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-chart-line text-indigo-600"></i>
+          <h3 class="text-base font-bold text-slate-900">Tu Progreso</h3>
+        </div>
+        <button onclick="closeProgressModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-4 text-xs pr-1">
+        <div class="space-y-2">
+          <select id="progressExerciseSelect" onchange="renderProgressView()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold"></select>
+          <div class="grid grid-cols-2 gap-2">
+            <select id="progressGymSelect" onchange="renderProgressView()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-semibold">
+              <option value="ALL">Todas las sedes</option>
+              <option value="CEN">Sede CEN</option>
+              <option value="POL">Sede POL</option>
+            </select>
+            <select id="progressMetricSelect" onchange="renderProgressView()" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-semibold">
+              <option value="weight">Mejor carga</option>
+              <option value="e1rm">1RM estimado</option>
+            </select>
+          </div>
+          <div id="progressChart" class="bg-slate-50 border border-slate-200 rounded-xl p-2"></div>
+          <div id="progressStats" class="grid grid-cols-2 gap-2"></div>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5"><i class="fa-solid fa-layer-group text-indigo-600"></i> Series por grupo muscular (últimas 4 semanas)</div>
+          <div id="weeklyVolumeTable" class="overflow-x-auto"></div>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="font-bold text-slate-800 text-xs flex items-center gap-1.5"><i class="fa-solid fa-trophy text-amber-500"></i> Récords personales</div>
+          <div id="progressPRList" class="space-y-1"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editar Registro -->
+  <div id="editLogModal" class="modal-backdrop hidden">
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 w-full max-w-md space-y-3 shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-indigo-600"></i>
+          <h3 class="text-sm font-bold text-slate-900">Editar registro</h3>
+        </div>
+        <button onclick="closeEditLogModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="editLogBody" class="flex-1 overflow-y-auto space-y-3 text-xs pr-1"></div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-slate-100 shrink-0">
+        <button onclick="closeEditLogModal()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-200 transition">Cancelar</button>
+        <button onclick="saveEditedLog()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Firebase y Gemini Integration -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, collection, addDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, getDoc, setDoc, collection, addDoc, deleteDoc, updateDoc, getDocs, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBxDsbym6-ONm-mW7Ldx3pXxmF_ZJbms5M",
@@ -712,6 +795,11 @@
 
     let activeSessionIndex = 0;
     let pendingAiProposal = null;
+    let coachHistory = [];
+    let pendingDeleteLogId = null;
+    let editingLogId = null;
+    let wakeLock = null;
+    let editingCatalogIdx = null;
     let openFeedbackIndex = null;
     let exerciseToDeleteIndex = null;
 
@@ -734,6 +822,10 @@
     function escapeHtml(str) {
       if (!str) return '';
       return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function normName(str) {
+      return String(str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
     }
 
     function showToast(message, type = 'info') {
@@ -772,17 +864,20 @@
       if (!bar) return;
       if (bar.classList.contains('hidden')) {
         bar.classList.remove('hidden');
+        requestWakeLock();
         if (!isRestTimerRunning) {
           updateRestTimerDisplay(restTimerDuration * 1000);
         }
       } else {
         bar.classList.add('hidden');
+        releaseWakeLock();
       }
     }
 
     function closeRestTimerBar() {
       const bar = document.getElementById('restTimerBar');
       if (bar) bar.classList.add('hidden');
+      releaseWakeLock();
       stopRestTimer();
     }
 
@@ -804,6 +899,8 @@
         restTimerDuration = seconds;
       }
       const bar = document.getElementById('restTimerBar');
+      requestWakeLock();
+      primeAudio();
       if (bar) {
         bar.classList.remove('hidden');
         bar.classList.remove('bg-rose-700', 'border-rose-600');
@@ -1157,6 +1254,16 @@
           lastPerfHtml = `<div class="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1"><i class="fa-solid fa-clock-rotate-left text-[9px] text-slate-400"></i><span>Última vez: ${escapeHtml(perfDesc)}</span></div>`;
         }
 
+        let suggHtml = '';
+        if (ex.status === 'pending') {
+          const sg = getProgressionSuggestion(ex);
+          if (sg) {
+            const palette = sg.action === 'up' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : sg.action === 'down' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200';
+            const sgIcon = sg.action === 'up' ? 'fa-arrow-trend-up' : sg.action === 'down' ? 'fa-arrow-trend-down' : 'fa-equals';
+            suggHtml = `<div class="mt-1 flex items-center gap-1.5 flex-wrap text-[10px]"><span class="border ${palette} px-1.5 py-0.5 rounded font-bold"><i class="fa-solid ${sgIcon} mr-1"></i>${escapeHtml(sg.text)}</span><span class="text-slate-400">${escapeHtml(sg.reason)}</span>${sg.action !== 'keep' ? `<button onclick="applyProgressionSuggestion(${idx})" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-2 py-0.5 rounded">Aplicar</button>` : ''}</div>`;
+          }
+        }
+
         const item = document.createElement('div');
         item.className = `bg-white border rounded-xl transition shadow-sm overflow-hidden ${
           isCompleted 
@@ -1184,9 +1291,7 @@
                 <div class="flex items-center gap-1.5">
                   <span class="font-bold text-slate-800 text-xs truncate ${isSkipped ? 'line-through text-rose-700/70' : ''}">${escapeHtml(ex.name)}</span>
                   ${ex.syncWeights ? `<span title="Peso sincronizado entre CEN y POL" class="text-[10px] text-indigo-500"><i class="fa-solid fa-link"></i></span>` : ''}
-                  <button onclick="toggleExerciseLock(${idx})" title="${ex.isLocked ? 'Bloqueado (Inamovible para la IA)' : 'Desbloqueado (Rotable por la IA)'}" class="text-[10px] text-slate-400 hover:text-indigo-600">
-                    <i class="fa-solid ${ex.isLocked ? 'fa-lock text-amber-500' : 'fa-lock-open text-slate-300'}"></i>
-                  </button>
+                  ${(allowedCatalog.find(c => c.name.toLowerCase() === ex.name.toLowerCase()) || {}).isLocked ? `<span title="Bloqueado en el catálogo (Inamovible para la IA)" class="text-[10px]"><i class="fa-solid fa-lock text-amber-500"></i></span>` : ''}
                 </div>
 
                 <div class="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 flex-wrap">
@@ -1197,6 +1302,7 @@
                   ${ex.rpe ? `<span class="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-medium border border-slate-200">RPE ${ex.rpe}</span>` : ''}
                 </div>
                 ${lastPerfHtml}
+                ${suggHtml}
               </div>
             </div>
 
@@ -1229,24 +1335,28 @@
                 <div class="space-y-1.5">
                   ${(ex.setsLog || []).map((s, sIdx) => `
                     <div class="flex items-center gap-2 bg-slate-50/80 p-1.5 rounded-lg border border-slate-200/80">
-                      <span class="text-[10px] font-bold text-slate-500 w-12 shrink-0">S${sIdx + 1}</span>
+                      <span class="text-[10px] font-bold text-slate-500 w-6 shrink-0">S${sIdx + 1}</span>
                       <div class="flex-1 flex items-center gap-1.5">
+                        <div class="flex items-center flex-1 gap-0.5">
+                        <button type="button" onclick="adjustSetWeight(${idx}, ${sIdx}, -1)" class="w-5 h-6 shrink-0 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold leading-none">−</button>
                         <div class="relative flex-1">
-                          <input type="number" step="0.5" id="setWeight_${idx}_${sIdx}" value="${s.weight ?? currentWeight}" 
+                          <input type="number" inputmode="decimal" step="0.5" id="setWeight_${idx}_${sIdx}" value="${s.weight ?? currentWeight}" 
                             class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 text-center"
                             placeholder="${ex.type === 'time' ? 'Seg' : 'Kg'}">
                           <span class="absolute right-1.5 top-1.5 text-[9px] text-slate-400 pointer-events-none">${ex.type === 'time' ? 's' : 'kg'}</span>
                         </div>
+                        <button type="button" onclick="adjustSetWeight(${idx}, ${sIdx}, 1)" class="w-5 h-6 shrink-0 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold leading-none">+</button>
+                        </div>
                         <span class="text-slate-400 text-xs">×</span>
                         <div class="relative flex-1">
-                          <input type="number" id="setReps_${idx}_${sIdx}" value="${s.reps ?? ex.reps}" 
+                          <input type="number" inputmode="numeric" id="setReps_${idx}_${sIdx}" value="${s.reps ?? ex.reps}" 
                             class="w-full bg-white border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 text-center"
                             placeholder="Reps">
                           <span class="absolute right-1.5 top-1.5 text-[9px] text-slate-400 pointer-events-none">${ex.type === 'time' ? 's' : 'reps'}</span>
                         </div>
                       </div>
                       <label class="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-300 cursor-pointer shrink-0">
-                        <input type="checkbox" id="setDone_${idx}_${sIdx}" ${s.done ? 'checked' : ''} class="w-3.5 h-3.5 text-emerald-600 rounded">
+                        <input type="checkbox" id="setDone_${idx}_${sIdx}" onchange="onSetDoneChanged(this)" ${s.done ? 'checked' : ''} class="w-3.5 h-3.5 text-emerald-600 rounded">
                         <span class="text-[10px] font-semibold text-slate-600">Hecha</span>
                       </label>
                     </div>
@@ -1466,7 +1576,6 @@
       document.getElementById('modalExSyncWeights').checked = true;
       document.getElementById('modalExTempo').value = '3-1-1-0';
       document.getElementById('modalExType').value = 'reps';
-      document.getElementById('modalExLocked').checked = false;
       document.getElementById('autoLoadedAlert').classList.add('hidden');
       document.getElementById('catalogAutocompleteDropdown').classList.add('hidden');
       updateExMeasureLabel();
@@ -1493,7 +1602,6 @@
       document.getElementById('modalExSyncWeights').checked = ex.syncWeights ?? (wCen === wPol);
 
       document.getElementById('modalExTempo').value = ex.tempo || '3-1-1-0';
-      document.getElementById('modalExLocked').checked = !!ex.isLocked;
       document.getElementById('autoLoadedAlert').classList.add('hidden');
       document.getElementById('catalogAutocompleteDropdown').classList.add('hidden');
 
@@ -1526,7 +1634,9 @@
         }
 
         const tempo = document.getElementById('modalExTempo').value.trim();
-        const isLocked = document.getElementById('modalExLocked').checked;
+        const catMatch = allowedCatalog.find(c => normName(c.name) === normName(name));
+        const isLocked = catMatch ? !!catMatch.isLocked : false;
+        if (!catMatch) showToast("Ese ejercicio no está en el catálogo: la IA no lo tendrá en cuenta al planificar.", "info");
 
         if (!editId) {
           const newExId = "ex_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
@@ -1536,6 +1646,7 @@
             weights: { CEN: weightCen, POL: weightPol },
             syncWeights: syncWeights,
             tempo, isLocked,
+            catalogId: catMatch ? catMatch.id : null,
             status: 'pending',
             sensation: 'Adecuada',
             rpe: '8',
@@ -1555,6 +1666,7 @@
             target.syncWeights = syncWeights;
             target.tempo = tempo;
             target.isLocked = isLocked;
+            target.catalogId = catMatch ? catMatch.id : null;
             ensureExerciseSetsLog(target);
             syncUnfinishedSetsToPlan(target);
           }
@@ -1653,9 +1765,25 @@
         }))
       };
 
+      const newPRs = [];
+      session.exercises.forEach(ex => {
+        if (ex.status !== 'completed' || ex.type === 'time') return;
+        const planned = (ex.weights && ex.weights[activeGymLocation] !== undefined) ? ex.weights[activeGymLocation] : (ex.weight || 0);
+        const best = bestSetOf({ status: ex.status, setsDetail: ex.setsLog, weight: planned, reps: ex.reps });
+        if (!best) return;
+        const w = Number(best.weight) || 0;
+        const r = Number(best.reps) || 0;
+        const prev = getExerciseHistory(ex.name, activeGymLocation);
+        if (!prev.length) return;
+        const isBody = w === 0 && prev.every(h => h.weight === 0);
+        const prevBest = Math.max(...prev.map(h => isBody ? h.reps : h.e1rm));
+        const nowVal = isBody ? r : estimate1RM(w, r);
+        if (nowVal > prevBest + 0.01) newPRs.push(`${ex.name} (${isBody ? r + ' reps' : w + 'kg×' + r})`);
+      });
+
       try {
         const logsCollRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs');
-        await addDoc(logsCollRef, logData);
+        addDoc(logsCollRef, logData).catch(err => showToast("Error al sincronizar el entrenamiento: " + err.message, "error"));
 
         session.exercises.forEach(ex => {
           ex.status = 'pending';
@@ -1667,8 +1795,10 @@
           }
         });
 
+        closeRestTimerBar();
         saveMainState();
-        showToast("¡Entrenamiento guardado con éxito!", "success");
+        showToast(navigator.onLine ? "¡Entrenamiento guardado con éxito!" : "Guardado en el móvil: se sincronizará al volver la conexión", "success");
+        if (newPRs.length) showToast("🏆 Nuevo récord: " + newPRs.join(', '), "success");
       } catch (err) {
         showToast("Error al guardar: " + err.message, "error");
       }
@@ -1706,7 +1836,7 @@
 
       try {
         const logsCollRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs');
-        await addDoc(logsCollRef, activityData);
+        addDoc(logsCollRef, activityData).catch(err => showToast("Error al sincronizar la actividad: " + err.message, "error"));
         closeExtraActivityModal();
         showToast(`¡${name} registrada! La IA adaptará la fatiga.`, "success");
       } catch (err) {
@@ -1742,24 +1872,126 @@
       });
     }
 
+    async function callGeminiJson(prompt) {
+      const key = String(geminiApiKey).trim();
+      const response = await fetch(geminiUrl(key), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const result = await response.json();
+      let rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+      const first = rawText.indexOf('{');
+      const last = rawText.lastIndexOf('}');
+      if (first !== -1 && last > first) rawText = rawText.slice(first, last + 1);
+      return JSON.parse(rawText);
+    }
+
+    function findCurrentSessionExercise(cat) {
+      for (const sess of workoutSessions) {
+        for (const e of (sess.exercises || [])) {
+          if (e.catalogId === cat.id || normName(e.name) === normName(cat.name)) return e;
+        }
+      }
+      return null;
+    }
+
+    // Valida y limpia el plan devuelto por la IA contra el catálogo y los bloqueados.
+    function validateAiPlan(plan, availableCatalog, lockedItems, expectedDays) {
+      const problems = [];
+      const unknown = [];
+      const sessionsIn = Array.isArray(plan?.sessions) ? plan.sessions : [];
+      const clean = { phaseExplanation: plan?.phaseExplanation || '', sessions: [] };
+
+      if (sessionsIn.length !== expectedDays) {
+        problems.push(`Has devuelto ${sessionsIn.length} sesiones y deben ser EXACTAMENTE ${expectedDays}.`);
+      }
+
+      sessionsIn.forEach((s, i) => {
+        const seen = new Set();
+        const exs = [];
+        (Array.isArray(s?.exercises) ? s.exercises : []).forEach(e => {
+          const cat = availableCatalog.find(c => normName(c.name) === normName(e?.name));
+          if (!cat) {
+            unknown.push(e?.name || '(sin nombre)');
+            return;
+          }
+          if (seen.has(cat.id)) return;
+          seen.add(cat.id);
+          const w = parseFloat(e.weight);
+          exs.push({
+            catalogId: cat.id,
+            name: cat.name,
+            sets: Math.max(1, parseInt(e.sets) || cat.defaultSets || 3),
+            reps: Math.max(1, parseInt(e.reps) || cat.defaultReps || 10),
+            weight: (Number.isFinite(w) && w >= 0) ? w : (cat.weights?.[activeGymLocation] ?? 0),
+            tempo: e.tempo || cat.tempo || '3-1-1-0',
+            notes: e.notes || ''
+          });
+        });
+        const sessName = s?.name || `Día ${i + 1}`;
+        if (exs.length < 3 || exs.length > 8) {
+          problems.push(`La sesión "${sessName}" tiene ${exs.length} ejercicios válidos y debe tener entre 4 y 7.`);
+        }
+        clean.sessions.push({ name: sessName, exercises: exs });
+      });
+
+      if (unknown.length) {
+        problems.push(`Estos ejercicios NO existen en el catálogo y están prohibidos: ${[...new Set(unknown)].join(', ')}. Usa solo nombres EXACTOS del catálogo.`);
+      }
+
+      const usedIds = new Set();
+      clean.sessions.forEach(sess => sess.exercises.forEach(e => usedIds.add(e.catalogId)));
+      const missingLocked = lockedItems.filter(c => !usedIds.has(c.id));
+      if (missingLocked.length) {
+        problems.push(`Faltan estos ejercicios BLOQUEADOS (obligatorios): ${missingLocked.map(c => c.name).join(', ')}.`);
+      }
+
+      return { clean, problems, unknown: [...new Set(unknown)], missingLocked };
+    }
+
     async function executePlanWeekAnalysis() {
       closePlanWeekModal();
       const btn = document.getElementById('btnAnalyze');
       btn.disabled = true;
       btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Reestructurando semana (${targetWeekDays} días) con Gemini...`;
 
-      const recentExtras = workoutLogs.filter(l => l.isExtraActivity).slice(0, 5);
-      const recentGymLogs = workoutLogs.filter(l => !l.isExtraActivity).slice(0, 8);
+      const recentExtras = getCompactExtras(8);
+      const recentGymLogs = getCompactGymLogs(12);
+      const progressSummary = buildProgressSummary(8);
+      const weeklySets = computeWeeklySetsForAi(4);
+      const ruleSuggestions = buildRuleSuggestions();
       const availableCatalogForGym = allowedCatalog.filter(c => activeGymLocation === 'CEN' ? c.inCen : c.inPol);
 
-      const lockedExercises = [];
-      workoutSessions.forEach(sess => {
-        if (sess.exercises) {
-          sess.exercises.forEach(e => {
-            if (e.isLocked) lockedExercises.push({ name: e.name, group: e.group, sets: e.sets, reps: e.reps, weights: e.weights, syncWeights: e.syncWeights });
-          });
-        }
+      const lockedItems = availableCatalogForGym.filter(c => c.isLocked);
+      const lockedOtherGym = allowedCatalog.filter(c => c.isLocked && !availableCatalogForGym.includes(c));
+      const lockedExercises = lockedItems.map(c => {
+        const cur = findCurrentSessionExercise(c);
+        return {
+          name: c.name,
+          group: c.group,
+          sets: cur?.sets ?? c.defaultSets,
+          reps: cur?.reps ?? c.defaultReps,
+          weights: cur?.weights ?? c.weights,
+          syncWeights: c.syncWeights
+        };
       });
+
+      const currentPlan = workoutSessions.map(sess => ({
+        name: sess.name,
+        exercises: (sess.exercises || []).map(e => ({
+          name: e.name,
+          sets: e.sets,
+          reps: e.reps,
+          weights: e.weights,
+          tempo: e.tempo
+        }))
+      }));
 
       const prompt = `Actúa como un entrenador de fuerza de élite y periodizador de hipertrofia.
 El usuario quiere estructurar su semana de entrenamiento para EXACTAMENTE ${targetWeekDays} DÍAS (sesiones).
@@ -1771,13 +2003,17 @@ REGLAS CRÍTICAS DE PLANIFICACIÓN:
    - 3 días: Ej. Push, Pull, Legs o Full Body 3 días.
    - 4 días: Ej. Torso, Pierna, Torso, Pierna o Upper/Lower/Push/Pull.
    - 5 días: Ej. Push, Pull, Legs, Upper, Lower o Torso, Pierna, Push, Pull, Brazos/Core.
-2. Cada sesión debe contener entre 4 y 7 ejercicios equilibrados.
-3. TODOS los ejercicios deben provenir EXCLUSIVAMENTE del catálogo disponible proporcionado abajo. Está terminantemente prohibido sugerir ejercicios fuera del catálogo.
+2. Cada sesión debe contener entre 4 y 7 ejercicios equilibrados, sin repetir un mismo ejercicio dentro de la misma sesión.
+3. TODOS los ejercicios deben provenir EXCLUSIVAMENTE del catálogo disponible proporcionado abajo, usando el nombre EXACTO del catálogo (sin variaciones). Está terminantemente prohibido sugerir ejercicios fuera del catálogo.
 4. Ejercicios bloqueados por el usuario (OBLIGATORIO incluirlos en alguna de las sesiones respetando sus características): ${JSON.stringify(lockedExercises)}.
-5. Si un ejercicio tiene syncWeights=true o es de peso libre, su progresión de carga es idéntica para ambas sedes.
+5. Si un ejercicio tiene syncWeights=true o es de peso libre, su progresión de carga es idéntica para ambas sedes. El campo "weight" que devuelvas son los kg para la sede activa (${activeGymLocation}).
 6. Historial de gimnasio: ${JSON.stringify(recentGymLogs)}.
 7. Fatiga y deportes extra: ${JSON.stringify(recentExtras)}.
 8. Catálogo permitido para esta sede: ${JSON.stringify(availableCatalogForGym)}.
+9. Plan actual del usuario (series, repeticiones y cargas que está usando ahora; úsalo como punto de partida de la progresión): ${JSON.stringify(currentPlan)}.
+10. Evolución por ejercicio en las últimas 8 semanas (fecha, sede, mejor serie, RPE y sensación): ${JSON.stringify(progressSummary)}.
+11. Series semanales hechas por grupo muscular (últimas 4 semanas; el último valor es la semana en curso). Equilibra el volumen y corrige descompensaciones: ${JSON.stringify(weeklySets)}.
+12. Sugerencias de progresión calculadas por reglas a partir de las últimas sesiones (úsalas como referencia, ajusta si el contexto lo pide): ${JSON.stringify(ruleSuggestions)}.
 
 Responde ÚNICAMENTE con un JSON con esta estructura exacta:
 {
@@ -1799,26 +2035,51 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
   ]
 }`;
 
-      const key = String(geminiApiKey).trim();
-      const apiUrl = geminiUrl(key);
-
       try {
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-          })
+        let plan = await callGeminiJson(prompt);
+        let v = validateAiPlan(plan, availableCatalogForGym, lockedItems, targetWeekDays);
+
+        // Un reintento corrigiendo los errores detectados
+        if (v.problems.length) {
+          btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Corrigiendo el plan con Gemini...`;
+          const retryPrompt = prompt + `\n\nTU RESPUESTA ANTERIOR TENÍA ERRORES. CORRÍGELOS TODOS Y DEVUELVE EL JSON COMPLETO DE NUEVO:\n- ${v.problems.join('\n- ')}\n\nRespuesta anterior: ${JSON.stringify(plan)}`;
+          try {
+            plan = await callGeminiJson(retryPrompt);
+            v = validateAiPlan(plan, availableCatalogForGym, lockedItems, targetWeekDays);
+          } catch (retryErr) {
+            console.warn("Reintento fallido, se repara el primer plan:", retryErr);
+          }
+        }
+
+        if (!v.clean.sessions.length) throw new Error("La IA no devolvió un plan válido");
+
+        const warnings = [];
+
+        if (v.clean.sessions.length !== targetWeekDays) {
+          warnings.push(`La IA devolvió ${v.clean.sessions.length} sesiones en lugar de ${targetWeekDays}.`);
+        }
+        if (v.unknown.length) {
+          warnings.push(`Se descartaron ejercicios que no están en tu catálogo para ${activeGymLocation}: ${v.unknown.join(', ')}.`);
+        }
+        v.missingLocked.forEach(item => {
+          const target = v.clean.sessions.reduce((a, b) => (b.exercises.length < a.exercises.length ? b : a));
+          const cur = findCurrentSessionExercise(item);
+          target.exercises.push({
+            catalogId: item.id,
+            name: item.name,
+            sets: cur?.sets ?? item.defaultSets ?? 3,
+            reps: cur?.reps ?? item.defaultReps ?? 10,
+            weight: cur?.weights?.[activeGymLocation] ?? item.weights?.[activeGymLocation] ?? 0,
+            tempo: cur?.tempo || item.tempo || '3-1-1-0',
+            notes: 'Ejercicio bloqueado (añadido automáticamente)'
+          });
+          warnings.push(`"${item.name}" está bloqueado y la IA no lo había incluido: lo he añadido a "${target.name}".`);
         });
+        if (lockedOtherGym.length) {
+          warnings.push(`Bloqueados que no están disponibles en la sede ${activeGymLocation} y no se han planificado: ${lockedOtherGym.map(c => c.name).join(', ')}.`);
+        }
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const result = await response.json();
-        let rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-        rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-        const parsed = JSON.parse(rawText);
-
-        renderAiProposal(parsed);
+        renderAiProposal({ ...v.clean, warnings });
       } catch (err) {
         console.error("Error Head Coach Gemini:", err);
         showToast("No se pudo completar el análisis: " + err.message, "error");
@@ -1838,6 +2099,14 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
       tag.textContent = `Sede ${activeGymLocation} (${proposal.sessions ? proposal.sessions.length : targetWeekDays} días)`;
       textEl.textContent = proposal.phaseExplanation || "Propuesta de periodización calculada.";
       container.innerHTML = '';
+
+      if (proposal.warnings && proposal.warnings.length) {
+        const warnDiv = document.createElement('div');
+        warnDiv.className = "bg-rose-50 border border-rose-200 text-rose-800 p-2.5 rounded-xl text-[11px] space-y-1";
+        warnDiv.innerHTML = `<div class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-triangle-exclamation"></i> Ajustes automáticos</div>` +
+          proposal.warnings.map(w => `<div>• ${escapeHtml(w)}</div>`).join('');
+        container.appendChild(warnDiv);
+      }
 
       if (proposal.sessions && Array.isArray(proposal.sessions)) {
         proposal.sessions.forEach((s, sIdx) => {
@@ -1890,7 +2159,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
         };
 
         (propSess.exercises || []).forEach(propEx => {
-          const catItem = allowedCatalog.find(c => c.name.toLowerCase() === propEx.name.toLowerCase());
+          const catItem = allowedCatalog.find(c => normName(c.name) === normName(propEx.name));
           
           let wCen = propEx.weight || 0;
           let wPol = propEx.weight || 0;
@@ -1914,6 +2183,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
 
           const exObj = {
             id: "ex_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+            catalogId: catItem ? catItem.id : null,
             name: catItem ? catItem.name : propEx.name,
             group: catItem ? catItem.group : "General",
             type: catItem ? (catItem.type || 'reps') : 'reps',
@@ -1922,7 +2192,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
             weights: { CEN: wCen, POL: wPol },
             syncWeights: isSync,
             tempo: propEx.tempo || (catItem ? catItem.tempo : "3-1-1-0"),
-            isLocked: false,
+            isLocked: catItem ? !!catItem.isLocked : false,
             status: 'pending',
             sensation: 'Adecuada',
             rpe: '8',
@@ -1976,7 +2246,13 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
       chatLog.scrollTop = chatLog.scrollHeight;
 
       const session = getActiveSession();
-      const prompt = `Eres un entrenador personal certificado. Sede "${activeGymLocation}". Sesión: ${JSON.stringify(session)}. Pregunta: "${text}"`;
+      const ctx = buildCoachContext();
+      const historyText = coachHistory.slice(-6).map(m => `${m.role === 'user' ? 'Usuario' : 'Coach'}: ${m.text}`).join('\n');
+      const prompt = `Eres un entrenador personal certificado y analista de rendimiento. Responde en español, de forma clara y concreta (unas 180 palabras como máximo salvo que pidan más), basándote en los DATOS REALES del usuario. Si los datos no bastan para responder con seguridad, dilo.
+DATOS DEL USUARIO: ${JSON.stringify(ctx)}
+CONVERSACIÓN PREVIA:
+${historyText || '(ninguna)'}
+PREGUNTA ACTUAL: "${text}"`;
 
       const key = String(geminiApiKey).trim();
       const apiUrl = geminiUrl(key);
@@ -1990,6 +2266,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
         const reply = result.candidates?.[0]?.content?.parts?.[0]?.text || "No pude generar respuesta.";
+        coachHistory.push({ role: 'user', text }, { role: 'coach', text: reply });
 
         chatLog.removeChild(loadingBubble);
         const aiBubble = document.createElement('div');
@@ -2029,21 +2306,17 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
             <div class="min-w-0 flex-1">
               <div class="font-bold text-slate-800 truncate flex items-center gap-1.5">
                 <span>${escapeHtml(item.name)}</span>
-                ${item.syncWeights ? `<span title="Mismo peso en CEN y POL" class="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-semibold"><i class="fa-solid fa-link mr-0.5"></i>Sync</span>` : ''}
+                ${item.syncWeights ? `<span title="Mismo peso en CEN y POL" class="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-semibold"><i class="fa-solid fa-rotate mr-0.5"></i>Sync</span>` : ''}
+                ${item.isLocked ? `<span title="Bloqueado (inamovible para la IA)" class="text-[10px] text-amber-500"><i class="fa-solid fa-lock"></i></span>` : ''}
               </div>
               <div class="text-[10px] text-slate-500">${item.group} • ${item.defaultSets}×${item.defaultReps} • CEN: ${item.weights?.CEN || 0}kg / POL: ${item.weights?.POL || 0}kg</div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.inCen ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'}">CEN</span>
               <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.inPol ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'}">POL</span>
+              <button onclick="editCatalogItem(${idx})" title="Editar" class="text-slate-400 hover:text-indigo-600 p-1"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
               <button onclick="removeCatalogItem(${idx})" class="text-slate-400 hover:text-rose-600 p-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
             </div>
-          </div>
-          <div class="flex items-center justify-between pt-1 border-t border-slate-200/60 text-[10px]">
-            <label class="flex items-center gap-1 text-slate-600 cursor-pointer">
-              <input type="checkbox" ${item.syncWeights ? 'checked' : ''} onchange="toggleCatalogItemSync(${idx}, this.checked)" class="w-3 h-3 text-indigo-600 rounded">
-              <span>Sincronizar peso en ambas sedes (peso libre)</span>
-            </label>
           </div>
         `;
         container.appendChild(row);
@@ -2093,8 +2366,37 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
       }
       const inCen = document.getElementById('newCatCen').checked;
       const inPol = document.getElementById('newCatPol').checked;
+      const isLocked = document.getElementById('newCatLocked').checked;
 
       if (!name) return;
+
+      const dupIdx = allowedCatalog.findIndex((c, i) => normName(c.name) === normName(name) && i !== editingCatalogIdx);
+      if (dupIdx !== -1) {
+        showToast("Ya existe un ejercicio con ese nombre en el catálogo.", "error");
+        return;
+      }
+
+      if (editingCatalogIdx !== null && allowedCatalog[editingCatalogIdx]) {
+        const target = allowedCatalog[editingCatalogIdx];
+        const oldW = { CEN: target.weights?.CEN ?? 0, POL: target.weights?.POL ?? 0 };
+        target.name = name;
+        target.group = group;
+        target.defaultSets = sets;
+        target.defaultReps = reps;
+        target.weights = { CEN: wCen, POL: wPol };
+        target.syncWeights = syncWeights;
+        target.inCen = inCen;
+        target.inPol = inPol;
+        target.isLocked = isLocked;
+        const weightsChanged = oldW.CEN !== wCen || oldW.POL !== wPol;
+        const updatedCount = propagateCatalogChange(target, weightsChanged);
+        localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+        resetCatalogForm();
+        saveMainState();
+        renderCatalogSettings();
+        showToast(updatedCount > 0 ? `Catálogo actualizado (también ${updatedCount} ejercicio(s) de tus sesiones)` : "Ejercicio del catálogo actualizado", "success");
+        return;
+      }
 
       allowedCatalog.push({
         id: "cat_" + Date.now(),
@@ -2103,18 +2405,106 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
         tempo: "3-1-1-0",
         weights: { CEN: wCen, POL: wPol },
         syncWeights: syncWeights,
-        inCen, inPol
+        inCen, inPol, isLocked
       });
 
       localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
-      document.getElementById('newCatName').value = '';
+      resetCatalogForm();
       saveMainState();
       renderCatalogSettings();
       showToast("Ejercicio añadido al catálogo", "success");
     }
 
+    // Propaga a las sesiones los cambios hechos en el catálogo (enlace por id).
+    // Los pesos solo se tocan si se han cambiado en el catálogo, para no pisar la progresión.
+    function propagateCatalogChange(item, weightsChanged) {
+      let count = 0;
+      workoutSessions.forEach(sess => {
+        (sess.exercises || []).forEach(ex => {
+          if (ex.catalogId !== item.id) return;
+          ex.name = item.name;
+          ex.group = item.group;
+          ex.syncWeights = !!item.syncWeights;
+          ex.isLocked = !!item.isLocked;
+          if (weightsChanged) {
+            ex.weights = { CEN: item.weights?.CEN ?? 0, POL: item.weights?.POL ?? 0 };
+          } else if (item.syncWeights) {
+            const w = ex.weights?.[activeGymLocation] ?? ex.weight ?? 0;
+            ex.weights = { CEN: w, POL: w };
+          }
+          syncUnfinishedSetsToPlan(ex);
+          count++;
+        });
+      });
+      return count;
+    }
+
+    // Enlaza por id los ejercicios de las sesiones que aún no lo tengan (migración de datos antiguos).
+    function linkExercisesToCatalog() {
+      let changed = false;
+      workoutSessions.forEach(sess => {
+        (sess.exercises || []).forEach(ex => {
+          if (ex.catalogId && allowedCatalog.some(c => c.id === ex.catalogId)) return;
+          const match = allowedCatalog.find(c => normName(c.name) === normName(ex.name));
+          const newId = match ? match.id : null;
+          if ((ex.catalogId || null) !== newId) {
+            ex.catalogId = newId;
+            changed = true;
+          }
+        });
+      });
+      return changed;
+    }
+
+    function editCatalogItem(idx) {
+      const item = allowedCatalog[idx];
+      if (!item) return;
+      editingCatalogIdx = idx;
+      document.getElementById('newCatName').value = item.name;
+      document.getElementById('newCatGroup').value = item.group;
+      document.getElementById('newCatSets').value = item.defaultSets ?? '';
+      document.getElementById('newCatReps').value = item.defaultReps ?? '';
+      document.getElementById('newCatWeightCen').value = item.weights?.CEN ?? 0;
+      document.getElementById('newCatWeightPol').value = item.weights?.POL ?? 0;
+      document.getElementById('newCatSyncWeights').checked = !!item.syncWeights;
+      document.getElementById('newCatLocked').checked = !!item.isLocked;
+      document.getElementById('newCatCen').checked = !!item.inCen;
+      document.getElementById('newCatPol').checked = !!item.inPol;
+      document.getElementById('catFormTitle').textContent = 'Editar Ejercicio del Catálogo';
+      document.getElementById('btnAddCatalogItem').textContent = 'Guardar cambios';
+      document.getElementById('btnCancelCatEdit').classList.remove('hidden');
+      document.getElementById('newCatName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function cancelCatalogEdit() {
+      resetCatalogForm();
+    }
+
+    function resetCatalogForm() {
+      editingCatalogIdx = null;
+      ['newCatName', 'newCatSets', 'newCatReps', 'newCatWeightCen', 'newCatWeightPol'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('newCatGroup').value = 'Pecho';
+      document.getElementById('newCatSyncWeights').checked = true;
+      document.getElementById('newCatLocked').checked = false;
+      document.getElementById('newCatCen').checked = true;
+      document.getElementById('newCatPol').checked = true;
+      document.getElementById('catFormTitle').textContent = 'Añadir Nuevo Ejercicio al Catálogo';
+      document.getElementById('btnAddCatalogItem').textContent = '+ Añadir';
+      document.getElementById('btnCancelCatEdit').classList.add('hidden');
+    }
+
     function removeCatalogItem(idx) {
-      allowedCatalog.splice(idx, 1);
+      const removed = allowedCatalog.splice(idx, 1)[0];
+      if (removed) {
+        workoutSessions.forEach(sess => {
+          (sess.exercises || []).forEach(ex => {
+            if (ex.catalogId === removed.id) ex.catalogId = null;
+          });
+        });
+      }
+      if (editingCatalogIdx !== null) resetCatalogForm();
       localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
       saveMainState();
       renderCatalogSettings();
@@ -2242,6 +2632,17 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
             </div>
           `;
         }
+        const actions = document.createElement('div');
+        actions.className = "flex justify-end items-center gap-1.5 pt-1";
+        if (pendingDeleteLogId === log.id) {
+          actions.innerHTML = `<span class="text-[10px] text-rose-700 font-semibold mr-auto">¿Borrar este registro?</span>
+            <button onclick="cancelDeleteLog()" class="px-2 py-1 rounded-lg bg-slate-200 text-slate-700 text-[10px] font-bold">No</button>
+            <button onclick="confirmDeleteLog('${log.id}')" class="px-2 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-bold">Sí, borrar</button>`;
+        } else {
+          actions.innerHTML = `<button onclick="openEditLogModal('${log.id}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 text-[10px] font-bold flex items-center gap-1"><i class="fa-solid fa-pen-to-square"></i> Editar</button>
+            <button onclick="promptDeleteLog('${log.id}')" class="px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-rose-600 text-[10px] font-bold flex items-center gap-1"><i class="fa-solid fa-trash-can"></i> Borrar</button>`;
+        }
+        item.appendChild(actions);
         container.appendChild(item);
       });
     }
@@ -2323,6 +2724,674 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
       }
     }
 
+    // ================= Progreso, historial y utilidades =================
+    function weekStartKey(dateStr) {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+      return getLocalDateString(dt);
+    }
+
+    function logDateKey(log) {
+      return log.localDate || (log.createdAt ? getLocalDateString(new Date(log.createdAt)) : '');
+    }
+
+    function formatShortDate(dateStr) {
+      if (!dateStr) return '';
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    }
+
+    function resolveGroup(d) {
+      if (d.group) return d.group;
+      const c = allowedCatalog.find(c => normName(c.name) === normName(d.name));
+      return c ? c.group : 'Otros';
+    }
+
+    function estimate1RM(weight, reps) {
+      return weight > 0 ? weight * (1 + reps / 30) : 0;
+    }
+
+    // Mejor serie realizada de un ejercicio dentro de un registro (mayor carga; desempate por reps)
+    function bestSetOf(d) {
+      let sets = [];
+      if (Array.isArray(d.setsDetail) && d.setsDetail.length) {
+        sets = d.setsDetail.filter(s => s.done);
+        if (!sets.length && d.status === 'completed') sets = d.setsDetail;
+      } else if (d.status === 'completed') {
+        sets = [{ weight: d.weight, reps: d.reps, done: true }];
+      }
+      sets = sets.map(s => ({ weight: Number(s.weight) || 0, reps: Number(s.reps) || 0 })).filter(s => s.reps > 0);
+      if (!sets.length) return null;
+      return sets.reduce((a, b) => (b.weight > a.weight || (b.weight === a.weight && b.reps > a.reps)) ? b : a);
+    }
+
+    function getLoggedExerciseNames() {
+      const names = new Map();
+      workoutLogs.forEach(log => {
+        if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) return;
+        log.exercisesDetail.forEach(d => {
+          const k = normName(d.name);
+          if (!names.has(k) && bestSetOf(d)) names.set(k, d.name);
+        });
+      });
+      return names;
+    }
+
+    // Historial cronológico (de más antiguo a más reciente) de la mejor serie de un ejercicio
+    function getExerciseHistory(name, gym = 'ALL') {
+      const out = [];
+      const target = normName(name);
+      [...workoutLogs].reverse().forEach(log => {
+        if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) return;
+        if (gym !== 'ALL' && (log.location || 'CEN') !== gym) return;
+        const d = log.exercisesDetail.find(x => normName(x.name) === target);
+        if (!d) return;
+        const best = bestSetOf(d);
+        if (!best) return;
+        out.push({
+          date: logDateKey(log),
+          gym: log.location || 'CEN',
+          weight: best.weight,
+          reps: best.reps,
+          e1rm: estimate1RM(best.weight, best.reps),
+          rpe: d.rpe || null,
+          sensation: d.sensation || null,
+          type: d.type || 'reps'
+        });
+      });
+      return out;
+    }
+
+    function formatEntry(h) {
+      if (h.type === 'time') return `${h.reps} s`;
+      if (h.weight === 0) return `${h.reps} reps`;
+      return `${h.weight} kg × ${h.reps}`;
+    }
+
+    function computeLogVolume(details) {
+      let volume = 0;
+      details.forEach(e => {
+        if (e.type === 'time') return;
+        const doneSets = Array.isArray(e.setsDetail) ? e.setsDetail.filter(s => s.done) : [];
+        if (doneSets.length > 0) {
+          doneSets.forEach(s => { volume += (Number(s.weight) || 0) * (Number(s.reps) || 0); });
+        } else if (e.status === 'completed') {
+          volume += (Number(e.sets) || 0) * (Number(e.reps) || 0) * (Number(e.weight) || 0);
+        }
+      });
+      return volume;
+    }
+
+    // ---- Series semanales por grupo muscular ----
+    function computeWeeklySetsByGroup(weeks = 4) {
+      const [ty, tm, td] = weekStartKey(getLocalDateString(new Date())).split('-').map(Number);
+      const weekKeys = [];
+      for (let i = weeks - 1; i >= 0; i--) {
+        weekKeys.push(getLocalDateString(new Date(ty, tm - 1, td - 7 * i)));
+      }
+      const data = {};
+      workoutLogs.forEach(log => {
+        if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) return;
+        const wk = weekStartKey(logDateKey(log));
+        if (!weekKeys.includes(wk)) return;
+        log.exercisesDetail.forEach(d => {
+          let n = 0;
+          if (Array.isArray(d.setsDetail) && d.setsDetail.length) n = d.setsDetail.filter(s => s.done).length;
+          else if (d.status === 'completed') n = parseInt(d.sets) || 0;
+          if (!n) return;
+          const g = resolveGroup(d);
+          data[g] = data[g] || {};
+          data[g][wk] = (data[g][wk] || 0) + n;
+        });
+      });
+      return { weekKeys, data };
+    }
+
+    function computeWeeklySetsForAi(weeks = 4) {
+      const { weekKeys, data } = computeWeeklySetsByGroup(weeks);
+      const series = {};
+      Object.keys(data).forEach(g => { series[g] = weekKeys.map(wk => data[g][wk] || 0); });
+      return { semanasInicioLunes: weekKeys, seriesHechasPorGrupo: series };
+    }
+
+    // ---- Contexto para la IA ----
+    function getCompactGymLogs(n = 12) {
+      return workoutLogs.filter(l => !l.isExtraActivity).slice(0, n).map(l => ({
+        fecha: logDateKey(l),
+        sesion: l.sessionName,
+        sede: l.location || 'CEN',
+        volumenKg: l.volume,
+        ejercicios: (l.exercisesDetail || []).map(d => ({
+          nombre: d.name,
+          estado: d.status,
+          series: (Array.isArray(d.setsDetail) && d.setsDetail.length)
+            ? d.setsDetail.map(s => `${s.weight}x${s.reps}${s.done ? '' : ' (no hecha)'}`).join(', ')
+            : `${d.sets}x${d.reps} con ${d.weight}kg`,
+          rpe: d.rpe,
+          sensacion: d.sensation,
+          notas: d.notes || undefined
+        }))
+      }));
+    }
+
+    function getCompactExtras(n = 8) {
+      return workoutLogs.filter(l => l.isExtraActivity).slice(0, n).map(l => ({
+        fecha: logDateKey(l),
+        actividad: l.activityType || l.sessionName,
+        fatiga: l.fatigueLevel,
+        notas: l.notes || undefined
+      }));
+    }
+
+    function buildProgressSummary(weeks = 8) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - weeks * 7);
+      const cutoffKey = getLocalDateString(cutoff);
+      const result = [];
+      getLoggedExerciseNames().forEach(displayName => {
+        const hist = getExerciseHistory(displayName).filter(h => h.date >= cutoffKey);
+        if (!hist.length) return;
+        const first = hist[0];
+        const last = hist[hist.length - 1];
+        result.push({
+          ejercicio: displayName,
+          sesiones: hist.length,
+          primeraYUltima: `${formatEntry(first)} -> ${formatEntry(last)}`,
+          evolucion: hist.slice(-6).map(h => `${formatShortDate(h.date)} ${h.gym}: ${formatEntry(h)}${h.rpe ? ' RPE ' + h.rpe : ''}${h.sensation ? ' (' + h.sensation + ')' : ''}`)
+        });
+      });
+      return result;
+    }
+
+    function buildRuleSuggestions() {
+      const out = [];
+      workoutSessions.forEach(sess => {
+        (sess.exercises || []).forEach(ex => {
+          const sg = getProgressionSuggestion(ex);
+          if (sg) out.push({ ejercicio: ex.name, accion: sg.action, propuesta: sg.text });
+        });
+      });
+      return out;
+    }
+
+    function buildCoachContext() {
+      const availableCatalog = allowedCatalog.filter(c => activeGymLocation === 'CEN' ? c.inCen : c.inPol);
+      return {
+        hoy: getLocalDateString(new Date()),
+        sedeActiva: activeGymLocation,
+        sesionActiva: getActiveSession(),
+        planActual: workoutSessions.map(sess => ({
+          nombre: sess.name,
+          ejercicios: (sess.exercises || []).map(e => ({ nombre: e.name, series: e.sets, reps: e.reps, pesos: e.weights, tempo: e.tempo }))
+        })),
+        catalogoDisponible: availableCatalog.map(c => ({ nombre: c.name, grupo: c.group, bloqueado: !!c.isLocked, pesos: c.weights })),
+        historialReciente: getCompactGymLogs(12),
+        actividadesExtra: getCompactExtras(8),
+        evolucionPorEjercicio: buildProgressSummary(8),
+        seriesSemanalesPorGrupo: computeWeeklySetsForAi(4),
+        sugerenciasProgresion: buildRuleSuggestions()
+      };
+    }
+
+    // ---- Sugerencia de progresión (reglas, sin IA) ----
+    function getProgressionSuggestion(ex) {
+      if (!ex) return null;
+      const gym = ex.syncWeights ? 'ALL' : activeGymLocation;
+      const target = normName(ex.name);
+      let entry = null;
+      for (const log of workoutLogs) {
+        if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) continue;
+        if (gym !== 'ALL' && (log.location || 'CEN') !== gym) continue;
+        const d = log.exercisesDetail.find(x => normName(x.name) === target && x.status === 'completed');
+        if (d) { entry = d; break; }
+      }
+      if (!entry) return null;
+
+      const isTime = (ex.type || entry.type) === 'time';
+      const targetReps = parseInt(entry.reps) || parseInt(ex.reps) || 10;
+      const plannedSets = parseInt(entry.sets) || 1;
+      const doneSets = Array.isArray(entry.setsDetail) ? entry.setsDetail.filter(s => s.done) : [];
+      const hasDetail = doneSets.length > 0;
+      const allSetsDone = hasDetail ? doneSets.length >= plannedSets : true;
+      const allRepsHit = hasDetail ? doneSets.every(s => (Number(s.reps) || 0) >= targetReps) : true;
+      const lastWeight = hasDetail ? Math.max(...doneSets.map(s => Number(s.weight) || 0)) : (Number(entry.weight) || 0);
+      const currentWeight = Number(ex.weights?.[activeGymLocation] ?? ex.weight ?? 0);
+      const currentReps = parseInt(ex.reps) || targetReps;
+      const sens = entry.sensation || 'Adecuada';
+      const rpe = String(entry.rpe || '8');
+      const reason = `${sens} · RPE ${rpe}${allRepsHit ? '' : ' · faltaron reps'}`;
+
+      let action = 'keep';
+      if (sens === 'Fallo') {
+        action = 'down';
+      } else if (allSetsDone && allRepsHit && (sens === 'Ligera' || rpe === '6-7' || (sens === 'Adecuada' && rpe === '8'))) {
+        action = 'up';
+      }
+
+      if (!isTime && lastWeight > 0) {
+        const stepW = lastWeight >= 100 ? 5 : (lastWeight >= 20 ? 2.5 : 1);
+        const upW = lastWeight + stepW;
+        const downW = Math.max(0, lastWeight - stepW);
+        if (action === 'up') {
+          if (currentWeight >= upW) return null;
+          return { action, mode: 'weight', weight: upW, text: `Sube a ${upW} kg`, reason };
+        }
+        if (action === 'down') {
+          if (currentWeight <= downW) return null;
+          return { action, mode: 'weight', weight: downW, text: `Baja a ${downW} kg`, reason };
+        }
+        if (currentWeight !== lastWeight) return null;
+        return { action, mode: 'weight', weight: currentWeight, text: `Mantén ${currentWeight} kg`, reason };
+      }
+
+      const unit = isTime ? ' s' : ' reps';
+      const stepR = isTime ? 5 : 1;
+      if (action === 'up') {
+        const nr = targetReps + stepR;
+        if (currentReps >= nr) return null;
+        return { action, mode: 'reps', reps: nr, text: `Sube a ${nr}${unit}`, reason };
+      }
+      if (action === 'down') {
+        const nr = Math.max(1, targetReps - stepR);
+        if (currentReps <= nr) return null;
+        return { action, mode: 'reps', reps: nr, text: `Baja a ${nr}${unit}`, reason };
+      }
+      if (currentReps !== targetReps) return null;
+      return { action, mode: 'reps', reps: currentReps, text: `Mantén ${currentReps}${unit}`, reason };
+    }
+
+    function applyProgressionSuggestion(idx) {
+      const session = getActiveSession();
+      const ex = session && session.exercises[idx];
+      if (!ex) return;
+      const sg = getProgressionSuggestion(ex);
+      if (!sg || sg.action === 'keep') return;
+      if (sg.mode === 'weight') {
+        const base = ex.weights || { CEN: ex.weight || 0, POL: ex.weight || 0 };
+        ex.weights = ex.syncWeights ? { CEN: sg.weight, POL: sg.weight } : { ...base, [activeGymLocation]: sg.weight };
+      } else {
+        ex.reps = sg.reps;
+      }
+      syncUnfinishedSetsToPlan(ex);
+      saveMainState();
+      showToast("Sugerencia aplicada", "success");
+    }
+
+    // ---- Comodidad en el gimnasio ----
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator && !wakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => { wakeLock = null; });
+        }
+      } catch (e) {
+        console.warn("Wake Lock no disponible:", e);
+        wakeLock = null;
+      }
+    }
+
+    function releaseWakeLock() {
+      try { if (wakeLock) wakeLock.release(); } catch (e) { /* nada */ }
+      wakeLock = null;
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      const bar = document.getElementById('restTimerBar');
+      if (document.visibilityState === 'visible' && bar && !bar.classList.contains('hidden')) requestWakeLock();
+    });
+
+    function primeAudio() {
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) { /* nada */ }
+    }
+
+    function onSetDoneChanged(el) {
+      if (el && el.checked) startRestTimer();
+    }
+
+    function adjustSetWeight(idx, sIdx, dir) {
+      const session = getActiveSession();
+      const ex = session && session.exercises[idx];
+      const input = document.getElementById(`setWeight_${idx}_${sIdx}`);
+      if (!ex || !input) return;
+      const cur = parseFloat(input.value) || 0;
+      const step = ex.type === 'time' ? 5 : (cur < 20 ? 1 : 2.5);
+      const next = Math.max(0, Math.round((cur + dir * step) * 2) / 2);
+      input.value = next;
+    }
+
+    // ---- Historial: editar y borrar registros ----
+    function promptDeleteLog(id) {
+      pendingDeleteLogId = id;
+      renderCalendar();
+    }
+
+    function cancelDeleteLog() {
+      pendingDeleteLogId = null;
+      renderCalendar();
+    }
+
+    function confirmDeleteLog(id) {
+      if (!db || !currentUser) return;
+      pendingDeleteLogId = null;
+      deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs', id))
+        .catch(err => showToast("Error al borrar: " + err.message, "error"));
+      showToast("Registro borrado", "success");
+    }
+
+    function openEditLogModal(id) {
+      const log = workoutLogs.find(l => l.id === id);
+      if (!log) return;
+      editingLogId = id;
+      const inputCls = "w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs text-slate-800";
+      let html = `<div><label class="block font-semibold text-slate-700 mb-1">Fecha</label>
+        <input type="date" id="editLogDate" value="${escapeHtml(logDateKey(log))}" class="${inputCls}"></div>`;
+
+      if (log.isExtraActivity) {
+        html += `<div><label class="block font-semibold text-slate-700 mb-1">Actividad</label>
+          <input type="text" id="editLogActName" value="${escapeHtml(log.activityType || '')}" class="${inputCls}"></div>
+          <div><label class="block font-semibold text-slate-700 mb-1">Fatiga</label>
+          <select id="editLogActFatigue" class="${inputCls}">
+            ${['Ligera', 'Moderada', 'Extrema'].map(f => `<option value="${f}" ${log.fatigueLevel === f ? 'selected' : ''}>${f}</option>`).join('')}
+          </select></div>
+          <div><label class="block font-semibold text-slate-700 mb-1">Detalles</label>
+          <input type="text" id="editLogActNotes" value="${escapeHtml(log.notes || '')}" class="${inputCls}"></div>`;
+      } else {
+        (log.exercisesDetail || []).forEach((d, i) => {
+          let setsHtml = '';
+          if (Array.isArray(d.setsDetail) && d.setsDetail.length) {
+            setsHtml = d.setsDetail.map((s, j) => `
+              <div class="flex items-center gap-1.5">
+                <span class="text-[10px] font-bold text-slate-500 w-6 shrink-0">S${j + 1}</span>
+                <input type="number" step="0.5" inputmode="decimal" id="editLogW_${i}_${j}" value="${Number(s.weight) || 0}" class="${inputCls} text-center">
+                <span class="text-slate-400">×</span>
+                <input type="number" inputmode="numeric" id="editLogR_${i}_${j}" value="${Number(s.reps) || 0}" class="${inputCls} text-center">
+                <label class="flex items-center gap-1 text-[10px] font-semibold text-slate-600 shrink-0"><input type="checkbox" id="editLogD_${i}_${j}" ${s.done ? 'checked' : ''}> Hecha</label>
+              </div>`).join('');
+          } else {
+            setsHtml = `<div class="flex items-center gap-1.5"><span class="text-[10px] font-semibold text-slate-500 shrink-0">Peso (kg)</span>
+              <input type="number" step="0.5" inputmode="decimal" id="editLogWeight_${i}" value="${Number(d.weight) || 0}" class="${inputCls} text-center"></div>`;
+          }
+          html += `<div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-bold text-slate-800 truncate">${escapeHtml(d.name)}</span>
+              <select id="editLogStatus_${i}" class="bg-white border border-slate-300 rounded-lg px-1.5 py-1 text-[11px] shrink-0">
+                <option value="completed" ${d.status === 'completed' ? 'selected' : ''}>✅ Realizado</option>
+                <option value="skipped" ${d.status === 'skipped' ? 'selected' : ''}>❌ Omitido</option>
+                <option value="pending" ${d.status === 'pending' ? 'selected' : ''}>⏳ Pendiente</option>
+              </select>
+            </div>
+            ${setsHtml}
+          </div>`;
+        });
+      }
+
+      document.getElementById('editLogBody').innerHTML = html;
+      document.getElementById('editLogModal').classList.remove('hidden');
+    }
+
+    function closeEditLogModal() {
+      editingLogId = null;
+      document.getElementById('editLogModal').classList.add('hidden');
+    }
+
+    function saveEditedLog() {
+      const log = workoutLogs.find(l => l.id === editingLogId);
+      if (!log || !db || !currentUser) { closeEditLogModal(); return; }
+
+      const oldDate = logDateKey(log);
+      const newDate = document.getElementById('editLogDate').value || oldDate;
+      const update = { localDate: newDate };
+
+      if (newDate !== oldDate) {
+        const [y, m, d] = newDate.split('-').map(Number);
+        const created = new Date(log.createdAt || Date.now());
+        created.setFullYear(y, m - 1, d);
+        update.createdAt = created.toISOString();
+      }
+
+      if (log.isExtraActivity) {
+        const name = document.getElementById('editLogActName').value.trim() || log.activityType || 'Actividad Deportiva';
+        update.activityType = name;
+        update.sessionName = `Extra: ${name}`;
+        update.fatigueLevel = document.getElementById('editLogActFatigue').value;
+        update.notes = document.getElementById('editLogActNotes').value.trim();
+      } else {
+        const details = (log.exercisesDetail || []).map((d, i) => {
+          const nd = { ...d };
+          nd.status = document.getElementById(`editLogStatus_${i}`).value;
+          if (Array.isArray(d.setsDetail) && d.setsDetail.length) {
+            nd.setsDetail = d.setsDetail.map((s, j) => ({
+              weight: parseFloat(document.getElementById(`editLogW_${i}_${j}`).value) || 0,
+              reps: parseInt(document.getElementById(`editLogR_${i}_${j}`).value) || 0,
+              done: document.getElementById(`editLogD_${i}_${j}`).checked
+            }));
+            nd.weight = Math.max(0, ...nd.setsDetail.map(s => s.weight));
+          } else {
+            nd.weight = parseFloat(document.getElementById(`editLogWeight_${i}`).value) || 0;
+          }
+          return nd;
+        });
+        update.exercisesDetail = details;
+        update.exercisesCount = details.length;
+        update.completedCount = details.filter(d => d.status === 'completed').length;
+        update.volume = computeLogVolume(details);
+      }
+
+      updateDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs', editingLogId), update)
+        .catch(err => showToast("Error al guardar cambios: " + err.message, "error"));
+      closeEditLogModal();
+      showToast("Registro actualizado", "success");
+    }
+
+    // ---- Pantalla de progreso ----
+    function openProgressModal() {
+      document.getElementById('progressGymSelect').value = activeGymLocation;
+      populateProgressExercises();
+      renderProgressView();
+      document.getElementById('progressModal').classList.remove('hidden');
+    }
+
+    function closeProgressModal() {
+      document.getElementById('progressModal').classList.add('hidden');
+    }
+
+    function populateProgressExercises() {
+      const sel = document.getElementById('progressExerciseSelect');
+      const prev = sel.value;
+      const list = [...getLoggedExerciseNames().values()].sort((a, b) => a.localeCompare(b, 'es'));
+      sel.innerHTML = list.length
+        ? list.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('')
+        : '<option value="">Sin datos todavía</option>';
+      if (prev && list.includes(prev)) sel.value = prev;
+    }
+
+    function buildProgressChartSvg(hist, fn, unit) {
+      if (!hist.length) {
+        return `<div class="text-[11px] text-slate-400 text-center py-6">Aún no hay registros de este ejercicio con esos filtros.</div>`;
+      }
+      const data = hist.slice(-20);
+      const W = 320, H = 160, L = 38, R = 12, T = 14, B = 26;
+      const vals = data.map(fn);
+      let min = Math.min(...vals);
+      let max = Math.max(...vals);
+      if (min === max) { min = Math.max(0, min - 1); max = max + 1; }
+      const innerW = W - L - R;
+      const innerH = H - T - B;
+      const x = i => data.length === 1 ? L + innerW / 2 : L + (i * innerW) / (data.length - 1);
+      const y = v => T + innerH * (1 - (v - min) / (max - min));
+      const fmt = v => String(Math.round(v * 10) / 10);
+      const maxIdx = vals.indexOf(Math.max(...vals));
+
+      let svg = `<div class="text-[10px] text-slate-500 mb-1 px-1">${unit} · punto naranja = máximo</div>`;
+      svg += `<svg viewBox="0 0 ${W} ${H}" class="w-full h-auto" role="img" aria-label="Evolución del ejercicio">`;
+      [min, (min + max) / 2, max].forEach(v => {
+        const yy = y(v);
+        svg += `<line x1="${L}" x2="${W - R}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>`;
+        svg += `<text x="${L - 4}" y="${(yy + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#64748b">${fmt(v)}</text>`;
+      });
+      if (data.length > 1) {
+        svg += `<polyline points="${data.map((h, i) => `${x(i).toFixed(1)},${y(vals[i]).toFixed(1)}`).join(' ')}" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      }
+      data.forEach((h, i) => {
+        svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(vals[i]).toFixed(1)}" r="${i === maxIdx ? 4 : 3}" fill="${i === maxIdx ? '#f59e0b' : '#4f46e5'}"/>`;
+      });
+      svg += `<text x="${L}" y="${H - 8}" font-size="9" fill="#64748b">${escapeHtml(formatShortDate(data[0].date))}</text>`;
+      svg += `<text x="${W - R}" y="${H - 8}" text-anchor="end" font-size="9" fill="#64748b">${escapeHtml(formatShortDate(data[data.length - 1].date))}</text>`;
+      svg += `</svg>`;
+      return svg;
+    }
+
+    function computePRs(gym) {
+      const out = [];
+      getLoggedExerciseNames().forEach(displayName => {
+        const hist = getExerciseHistory(displayName, gym);
+        if (!hist.length) return;
+        const isTime = hist[0].type === 'time';
+        const allBody = hist.every(h => h.weight === 0);
+        const key = h => (isTime || allBody) ? h.reps : h.weight * 1000 + h.reps;
+        const best = hist.reduce((a, b) => key(b) > key(a) ? b : a);
+        out.push({ name: displayName, best });
+      });
+      return out.sort((a, b) => b.best.date.localeCompare(a.best.date));
+    }
+
+    function renderProgressView() {
+      const name = document.getElementById('progressExerciseSelect').value;
+      const gym = document.getElementById('progressGymSelect').value;
+      const metric = document.getElementById('progressMetricSelect').value;
+      const hist = name ? getExerciseHistory(name, gym) : [];
+
+      const isTime = hist.length > 0 && hist[0].type === 'time';
+      const allBody = hist.length > 0 && hist.every(h => h.weight === 0);
+      let unit = metric === 'e1rm' ? 'kg (1RM estimado)' : 'kg (mejor serie)';
+      let fn = h => metric === 'e1rm' ? h.e1rm : h.weight;
+      if (isTime) { unit = 'segundos'; fn = h => h.reps; }
+      else if (allBody) { unit = 'repeticiones'; fn = h => h.reps; }
+
+      document.getElementById('progressChart').innerHTML = buildProgressChartSvg(hist, fn, unit);
+
+      const statsEl = document.getElementById('progressStats');
+      if (!hist.length) {
+        statsEl.innerHTML = '';
+      } else {
+        const key = h => (isTime || allBody) ? h.reps : h.weight * 1000 + h.reps;
+        const best = hist.reduce((a, b) => key(b) > key(a) ? b : a);
+        const last = hist[hist.length - 1];
+        const bestE1 = Math.max(...hist.map(h => h.e1rm));
+        const card = (label, value, sub) => `<div class="bg-white border border-slate-200 rounded-xl p-2.5">
+          <div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">${label}</div>
+          <div class="text-sm font-bold text-slate-800 mt-0.5">${escapeHtml(value)}</div>
+          ${sub ? `<div class="text-[10px] text-slate-400">${escapeHtml(sub)}</div>` : ''}
+        </div>`;
+        statsEl.innerHTML =
+          card('🏆 Récord', formatEntry(best), formatShortDate(best.date)) +
+          card('Última vez', formatEntry(last), formatShortDate(last.date)) +
+          (bestE1 > 0 ? card('Mejor 1RM est.', `${Math.round(bestE1 * 10) / 10} kg`, 'fórmula de Epley') : '') +
+          card('Sesiones', String(hist.length), 'con registro');
+      }
+
+      // Tabla de series semanales por grupo
+      const { weekKeys, data } = computeWeeklySetsByGroup(4);
+      const baseGroups = ['Pecho', 'Espalda', 'Pierna', 'Hombro', 'Bíceps', 'Tríceps', 'Core'];
+      const extra = Object.keys(data).filter(g => !baseGroups.includes(g));
+      const groups = [...baseGroups, ...extra];
+      const cellCls = n => n === 0 ? 'text-slate-300' : n <= 5 ? 'bg-amber-50 text-amber-700' : n <= 9 ? 'bg-indigo-50 text-indigo-700' : n <= 20 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
+      let table = `<table class="w-full text-center text-[11px]"><thead><tr class="text-slate-400"><th class="text-left font-semibold py-1">Grupo</th>` +
+        weekKeys.map((wk, i) => `<th class="font-semibold py-1">${i === weekKeys.length - 1 ? 'Esta sem.' : escapeHtml(formatShortDate(wk))}</th>`).join('') + `</tr></thead><tbody>`;
+      groups.forEach(g => {
+        table += `<tr class="border-t border-slate-100"><td class="text-left font-semibold text-slate-700 py-1">${escapeHtml(g)}</td>` +
+          weekKeys.map(wk => { const n = (data[g] && data[g][wk]) || 0; return `<td class="py-1"><span class="inline-block min-w-[26px] rounded px-1 py-0.5 font-bold ${cellCls(n)}">${n || '–'}</span></td>`; }).join('') + `</tr>`;
+      });
+      table += `</tbody></table><p class="text-[10px] text-slate-400 mt-1.5">Series hechas por semana (lunes a domingo). Como referencia orientativa, entre 10 y 20 series semanales por grupo suele ser una zona habitual para hipertrofia.</p>`;
+      document.getElementById('weeklyVolumeTable').innerHTML = table;
+
+      // Récords
+      const prs = computePRs(gym);
+      document.getElementById('progressPRList').innerHTML = prs.length
+        ? prs.map(p => `<div class="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+            <span class="font-semibold text-slate-700 truncate">${escapeHtml(p.name)}</span>
+            <span class="text-[11px] text-slate-600 shrink-0"><b class="text-indigo-600">${escapeHtml(formatEntry(p.best))}</b> · ${escapeHtml(formatShortDate(p.best.date))}</span>
+          </div>`).join('')
+        : '<p class="text-[11px] text-slate-400">Aún no hay entrenamientos guardados.</p>';
+    }
+
+    // ---- Exportar copia de seguridad ----
+    function downloadTextFile(filename, mime, content) {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function fetchAllLogs() {
+      const logsCollRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs');
+      const snap = await getDocs(query(logsCollRef, orderBy('createdAt', 'desc')));
+      const all = [];
+      snap.forEach(d => all.push({ id: d.id, ...d.data() }));
+      return all;
+    }
+
+    async function exportBackupJson() {
+      if (!db || !currentUser) { showToast("Inicia sesión para exportar.", "info"); return; }
+      try {
+        showToast("Preparando copia de seguridad...", "info");
+        const logs = await fetchAllLogs();
+        const payload = {
+          app: 'FitTracker AI',
+          exportedAt: new Date().toISOString(),
+          sessions: workoutSessions,
+          allowedCatalog: allowedCatalog,
+          workoutLogs: logs
+        };
+        downloadTextFile(`fittracker-backup-${getLocalDateString()}.json`, 'application/json', JSON.stringify(payload, null, 2));
+        showToast(`Copia descargada (${logs.length} registros)`, "success");
+      } catch (err) {
+        showToast("No se pudo exportar: " + err.message, "error");
+      }
+    }
+
+    async function exportHistoryCsv() {
+      if (!db || !currentUser) { showToast("Inicia sesión para exportar.", "info"); return; }
+      try {
+        showToast("Preparando CSV...", "info");
+        const logs = (await fetchAllLogs()).reverse();
+        const rows = [['fecha', 'sede', 'sesion', 'ejercicio', 'grupo', 'serie', 'peso_kg', 'reps_o_seg', 'hecha', 'rpe', 'sensacion', 'notas']];
+        logs.forEach(log => {
+          if (log.isExtraActivity) {
+            rows.push([logDateKey(log), '', log.sessionName, '', '', '', '', '', '', '', log.fatigueLevel || '', log.notes || '']);
+            return;
+          }
+          (log.exercisesDetail || []).forEach(d => {
+            const sets = (Array.isArray(d.setsDetail) && d.setsDetail.length)
+              ? d.setsDetail
+              : [{ weight: d.weight, reps: d.reps, done: d.status === 'completed' }];
+            sets.forEach((s, i) => {
+              rows.push([logDateKey(log), log.location || '', log.sessionName, d.name, resolveGroup(d), i + 1, s.weight, s.reps, s.done ? 'si' : 'no', d.rpe || '', d.sensation || '', d.notes || '']);
+            });
+          });
+        });
+        const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const csv = '﻿' + rows.map(r => r.map(cell).join(';')).join('\r\n');
+        downloadTextFile(`fittracker-historial-${getLocalDateString()}.csv`, 'text/csv;charset=utf-8', csv);
+        showToast("CSV descargado", "success");
+      } catch (err) {
+        showToast("No se pudo exportar: " + err.message, "error");
+      }
+    }
+
     // Funciones en window
     window.setGymLocation = setGymLocation;
     window.toggleLoginModal = toggleLoginModal;
@@ -2333,6 +3402,8 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
     window.openSettingsModal = openSettingsModal;
     window.closeSettingsModal = closeSettingsModal;
     window.addCatalogItem = addCatalogItem;
+    window.editCatalogItem = editCatalogItem;
+    window.cancelCatalogEdit = cancelCatalogEdit;
     window.removeCatalogItem = removeCatalogItem;
     window.toggleCatalogItemSync = toggleCatalogItemSync;
     window.onNewCatSyncToggled = onNewCatSyncToggled;
@@ -2374,12 +3445,32 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
     window.setRestTimerPreset = setRestTimerPreset;
     window.toggleRestTimerRunning = toggleRestTimerRunning;
     window.showToast = showToast;
+    window.openProgressModal = openProgressModal;
+    window.closeProgressModal = closeProgressModal;
+    window.renderProgressView = renderProgressView;
+    window.openEditLogModal = openEditLogModal;
+    window.closeEditLogModal = closeEditLogModal;
+    window.saveEditedLog = saveEditedLog;
+    window.promptDeleteLog = promptDeleteLog;
+    window.cancelDeleteLog = cancelDeleteLog;
+    window.confirmDeleteLog = confirmDeleteLog;
+    window.exportBackupJson = exportBackupJson;
+    window.exportHistoryCsv = exportHistoryCsv;
+    window.applyProgressionSuggestion = applyProgressionSuggestion;
+    window.adjustSetWeight = adjustSetWeight;
+    window.onSetDoneChanged = onSetDoneChanged;
 
     // Inicialización Firebase
     try {
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
-      db = getFirestore(app);
+      try {
+        // Caché local persistente: permite guardar sin conexión y sincronizar al volver la señal
+        db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+      } catch (cacheErr) {
+        console.warn("Sin caché persistente, usando modo normal:", cacheErr);
+        db = getFirestore(app);
+      }
 
       onAuthStateChanged(auth, async (user) => {
         currentUser = user;
@@ -2462,8 +3553,12 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
             allowedCatalog = data.allowedCatalog;
             localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
           }
-          renderAll();
-        } else {
+          if (linkExercisesToCatalog()) {
+            saveMainState();
+          } else {
+            renderAll();
+          }
+        } else if (!docSnap.metadata.fromCache) {
           workoutSessions = [
             {
               id: "sess_empuje",
