@@ -1,9 +1,9 @@
 {
-  "id": "/fittracker-app-v1",
+  "id": "/gym/",
   "name": "FitTracker AI",
   "short_name": "FitTracker",
-  "start_url": "./index.html",
-  "scope": "./",
+  "start_url": "/gym/index.html",
+  "scope": "/gym/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#4f46e5",
