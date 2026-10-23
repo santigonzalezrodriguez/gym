@@ -70,10 +70,6 @@
 
       <!-- Acciones de Cabecera -->
       <div class="flex items-center gap-1.5 shrink-0">
-        <button onclick="toggleRestTimerBar()" title="Temporizador de descanso" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 flex items-center justify-center transition">
-          <i class="fa-solid fa-stopwatch text-xs"></i>
-        </button>
-
         <button onclick="openExtraActivityModal()" title="Registrar Actividad Deportiva Extra" class="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2.5 py-1.5 rounded-xl transition text-xs font-bold flex items-center gap-1">
           <i class="fa-solid fa-person-running text-amber-600"></i>
           <span>+ Extra</span>
@@ -533,6 +529,20 @@
             <input type="number" step="0.5" id="newCatWeightCen" placeholder="CEN kg" oninput="onNewCatWeightChanged('CEN', this.value)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
             <input type="number" step="0.5" id="newCatWeightPol" placeholder="POL kg" oninput="onNewCatWeightChanged('POL', this.value)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
           </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <input type="text" id="newCatTempo" placeholder="Tempo (3-1-1-0)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono">
+            <select id="newCatRpe" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-800">
+              <option value="">Sin RPE objetivo</option>
+              <option value="6-7">RPE obj. 6-7 (3-4 en reserva)</option>
+              <option value="8" selected>RPE obj. 8 (2 en reserva)</option>
+              <option value="9">RPE obj. 9 (1 en reserva)</option>
+              <option value="10">RPE obj. 10 (al fallo)</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            <input type="number" id="newCatRepMin" placeholder="Reps mín (ej. 8)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
+            <input type="number" id="newCatRepMax" placeholder="Reps máx (ej. 12)" class="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs">
+          </div>
           <div class="pt-1 space-y-1.5">
             <div class="flex items-center gap-3 flex-wrap">
               <label class="flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 cursor-pointer">
@@ -562,6 +572,10 @@
             </div>
           </div>
         </div>
+
+        <button onclick="loadBaseCatalog()" class="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-list-check"></i> Añadir catálogo base (máquinas, sin pesos)
+        </button>
 
         <div id="catalogList" class="space-y-1.5 pt-1"></div>
       </div>
@@ -796,6 +810,9 @@
     let activeSessionIndex = 0;
     let pendingAiProposal = null;
     let coachHistory = [];
+    let progressBaseline = null;   // la IA y las sugerencias ignoran entrenamientos anteriores a esta fecha
+    let initialResetDone = false;  // el reinicio inicial solo se hace una vez
+    let resetInProgress = false;
     let pendingDeleteLogId = null;
     let editingLogId = null;
     let wakeLock = null;
@@ -1300,6 +1317,7 @@
                   <span class="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100 text-[10px]">${currentWeight} kg (${activeGymLocation})</span>
                   ${ex.tempo ? `<span class="bg-violet-50 text-violet-700 border border-violet-100 px-1 py-0.2 rounded text-[9px] font-mono font-medium" title="Tempo: Excéntrico - Pausa - Concéntrico"><i class="fa-solid fa-stopwatch text-[8px] mr-0.5"></i>${escapeHtml(ex.tempo)}</span>` : ''}
                   ${ex.rpe ? `<span class="bg-slate-100 text-slate-600 px-1 py-0.2 rounded text-[9px] font-medium border border-slate-200">RPE ${ex.rpe}</span>` : ''}
+                  ${getTargetRpe(ex) ? `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-1 py-0.2 rounded text-[9px] font-semibold" title="Objetivo de esfuerzo al terminar la serie"><i class="fa-solid fa-bullseye text-[8px] mr-0.5"></i>RPE ${escapeHtml(getTargetRpe(ex))} · ${escapeHtml(rpeHint(getTargetRpe(ex)))}</span>` : ''}
                 </div>
                 ${lastPerfHtml}
                 ${suggHtml}
@@ -1356,7 +1374,7 @@
                         </div>
                       </div>
                       <label class="flex items-center gap-1 px-2 py-1 rounded bg-white border border-slate-300 cursor-pointer shrink-0">
-                        <input type="checkbox" id="setDone_${idx}_${sIdx}" onchange="onSetDoneChanged(this)" ${s.done ? 'checked' : ''} class="w-3.5 h-3.5 text-emerald-600 rounded">
+                        <input type="checkbox" id="setDone_${idx}_${sIdx}" ${s.done ? 'checked' : ''} class="w-3.5 h-3.5 text-emerald-600 rounded">
                         <span class="text-[10px] font-semibold text-slate-600">Hecha</span>
                       </label>
                     </div>
@@ -1390,6 +1408,7 @@
                     <option value="9" ${ex.rpe === '9' ? 'selected' : ''}>RPE 9 (1 rep en reserva)</option>
                     <option value="10" ${ex.rpe === '10' ? 'selected' : ''}>RPE 10 (Fallo absoluto)</option>
                   </select>
+                  ${getTargetRpe(ex) ? `<div class="text-[10px] text-amber-700 mt-0.5">🎯 Objetivo: RPE ${escapeHtml(getTargetRpe(ex))} (${escapeHtml(rpeHint(getTargetRpe(ex)))})</div>` : ''}
                 </div>
               </div>
 
@@ -1647,6 +1666,7 @@
             syncWeights: syncWeights,
             tempo, isLocked,
             catalogId: catMatch ? catMatch.id : null,
+            targetRpe: catMatch ? (catMatch.targetRpe || null) : null,
             status: 'pending',
             sensation: 'Adecuada',
             rpe: '8',
@@ -1773,7 +1793,7 @@
         if (!best) return;
         const w = Number(best.weight) || 0;
         const r = Number(best.reps) || 0;
-        const prev = getExerciseHistory(ex.name, activeGymLocation);
+        const prev = getExerciseHistory(ex.name, activeGymLocation, true);
         if (!prev.length) return;
         const isBody = w === 0 && prev.every(h => h.weight === 0);
         const prevBest = Math.max(...prev.map(h => isBody ? h.reps : h.e1rm));
@@ -1902,11 +1922,15 @@
     }
 
     // Valida y limpia el plan devuelto por la IA contra el catálogo y los bloqueados.
-    function validateAiPlan(plan, availableCatalog, lockedItems, expectedDays) {
+    // Valida y limpia el plan devuelto por la IA contra el catálogo, el historial y las reglas de progresión/variación.
+    // final=false: solo detecta problemas (para el reintento). final=true: además corrige lo que siga mal.
+    function validateAiPlan(plan, availableCatalog, lockedItems, expectedDays, ctx, final = false) {
       const problems = [];
       const unknown = [];
       const sessionsIn = Array.isArray(plan?.sessions) ? plan.sessions : [];
       const clean = { phaseExplanation: plan?.phaseExplanation || '', sessions: [] };
+      const notes = [];
+      const noBase = [];
 
       if (sessionsIn.length !== expectedDays) {
         problems.push(`Has devuelto ${sessionsIn.length} sesiones y deben ser EXACTAMENTE ${expectedDays}.`);
@@ -1923,16 +1947,10 @@
           }
           if (seen.has(cat.id)) return;
           seen.add(cat.id);
-          const w = parseFloat(e.weight);
-          exs.push({
-            catalogId: cat.id,
-            name: cat.name,
-            sets: Math.max(1, parseInt(e.sets) || cat.defaultSets || 3),
-            reps: Math.max(1, parseInt(e.reps) || cat.defaultReps || 10),
-            weight: (Number.isFinite(w) && w >= 0) ? w : (cat.weights?.[activeGymLocation] ?? 0),
-            tempo: e.tempo || cat.tempo || '3-1-1-0',
-            notes: e.notes || ''
-          });
+          const built = buildPlanEntry(cat, e, ctx);
+          built.notes.forEach(n => notes.push(n));
+          if (built.noBase) noBase.push(cat.name);
+          exs.push(built.entry);
         });
         const sessName = s?.name || `Día ${i + 1}`;
         if (exs.length < 3 || exs.length > 8) {
@@ -1940,6 +1958,67 @@
         }
         clean.sessions.push({ name: sessName, exercises: exs });
       });
+
+      // Variación con criterio: solo se sustituye por estancamiento, un máximo por semana y del mismo grupo
+      if (ctx.planComparable) {
+        const currentById = new Map();
+        workoutSessions.forEach(sess => (sess.exercises || []).forEach(ex => {
+          const c = getCatalogFor(ex);
+          if (c && !currentById.has(c.id)) currentById.set(c.id, ex);
+        }));
+        const inNew = new Set();
+        clean.sessions.forEach(sess => sess.exercises.forEach(en => inNew.add(en.catalogId)));
+
+        const subs = [];
+        clean.sessions.forEach((sess, si) => sess.exercises.forEach((en, ei) => {
+          if (currentById.has(en.catalogId)) return;
+          const cat = allowedCatalog.find(c => c.id === en.catalogId);
+          const repCat = en.reemplazaA ? allowedCatalog.find(c => normName(c.name) === normName(en.reemplazaA)) : null;
+          const validRep = !!repCat && currentById.has(repCat.id) && !inNew.has(repCat.id);
+          let why = '';
+          let short = '';
+          if (!validRep) {
+            why = `"${en.name}" es un ejercicio nuevo y no indicas en "reemplazaA" un ejercicio del plan actual que salga del plan`;
+            short = 'no se indicó qué ejercicio sale';
+          } else if (repCat.group !== cat.group) {
+            why = `"${en.name}" no puede sustituir a "${repCat.name}": son de grupos musculares distintos`;
+            short = 'son de grupos musculares distintos';
+          } else {
+            const rb = ctx.briefMap.get(repCat.id);
+            if (rb && !rb.estancado && rb.rec.accion !== 'sin_datos') {
+              why = `"${repCat.name}" sigue progresando (no está estancado), no hay motivo para sustituirlo por "${en.name}"`;
+              short = 'el actual sigue progresando';
+            }
+          }
+          subs.push({ si, ei, en, repCat, validRep, why, short });
+        }));
+
+        const unjustified = subs.filter(x => x.why);
+        const justified = subs.filter(x => !x.why);
+        unjustified.forEach(x => problems.push(x.why + '.'));
+        if (justified.length > ctx.maxSubs) {
+          problems.push(`Has hecho ${justified.length} sustituciones y el máximo es ${ctx.maxSubs} por semana.`);
+        }
+
+        if (final) {
+          const toRevert = unjustified.map(x => ({ x, reason: x.short }));
+          justified.slice(ctx.maxSubs).forEach(x => toRevert.push({ x, reason: `se superó el máximo de ${ctx.maxSubs} sustituciones por semana` }));
+          const used = new Set();
+          toRevert.forEach(({ x, reason }) => {
+            const rb = x.validRep ? ctx.briefMap.get(x.repCat.id) : null;
+            if (rb && !used.has(x.repCat.id)) {
+              used.add(x.repCat.id);
+              const rr = rb.rec;
+              const restored = buildPlanEntry(x.repCat, { sets: rb.curSets, reps: rr.reps ?? rb.curReps, weight: rr.peso ?? rb.planW, tempo: rb.tempo }, ctx);
+              restored.entry.motivo = 'Se mantiene el ejercicio actual: no había motivo suficiente para sustituirlo.';
+              clean.sessions[x.si].exercises[x.ei] = restored.entry;
+              notes.push(`Se mantiene "${x.repCat.name}" en lugar de "${x.en.name}" (${reason}).`);
+            } else {
+              notes.push(`Aviso: "${x.en.name}" entra como ejercicio nuevo (${reason}).`);
+            }
+          });
+        }
+      }
 
       if (unknown.length) {
         problems.push(`Estos ejercicios NO existen en el catálogo y están prohibidos: ${[...new Set(unknown)].join(', ')}. Usa solo nombres EXACTOS del catálogo.`);
@@ -1952,7 +2031,12 @@
         problems.push(`Faltan estos ejercicios BLOQUEADOS (obligatorios): ${missingLocked.map(c => c.name).join(', ')}.`);
       }
 
-      return { clean, problems, unknown: [...new Set(unknown)], missingLocked };
+      if (noBase.length) {
+        notes.push(`Sin carga de referencia (quedan en 0 kg hasta que la indiques; ignóralo si es peso corporal): ${[...new Set(noBase)].join(', ')}.`);
+      }
+      clean.weeklyReview = sanitizeReview(plan?.weeklyReview);
+
+      return { clean, problems, unknown: [...new Set(unknown)], missingLocked, notes };
     }
 
     async function executePlanWeekAnalysis() {
@@ -1967,6 +2051,22 @@
       const weeklySets = computeWeeklySetsForAi(4);
       const ruleSuggestions = buildRuleSuggestions();
       const availableCatalogForGym = allowedCatalog.filter(c => activeGymLocation === 'CEN' ? c.inCen : c.inPol);
+      const weekReview = buildWeekReviewData();
+      const briefs = buildExerciseBriefs(availableCatalogForGym);
+      // Si ningún ejercicio del plan actual tiene historial, no hay nada que proteger: estructura libre
+      const planBriefs = workoutSessions
+        .flatMap(sess => sess.exercises || [])
+        .map(ex => getCatalogFor(ex))
+        .filter(Boolean)
+        .map(c => briefs.map.get(c.id))
+        .filter(Boolean);
+      const freshStart = planBriefs.length === 0 || planBriefs.every(pb => pb.rec.accion === 'sin_datos');
+      const ctx = {
+        briefMap: briefs.map,
+        groupSets: weekReview.seriesPorGrupo || {},
+        planComparable: workoutSessions.length > 0 && workoutSessions.length === targetWeekDays && !freshStart,
+        maxSubs: 2
+      };
 
       const lockedItems = availableCatalogForGym.filter(c => c.isLocked);
       const lockedOtherGym = allowedCatalog.filter(c => c.isLocked && !availableCatalogForGym.includes(c));
@@ -1989,7 +2089,8 @@
           sets: e.sets,
           reps: e.reps,
           weights: e.weights,
-          tempo: e.tempo
+          tempo: e.tempo,
+          rpeObjetivo: getTargetRpe(e)
         }))
       }));
 
@@ -2009,14 +2110,38 @@ REGLAS CRÍTICAS DE PLANIFICACIÓN:
 5. Si un ejercicio tiene syncWeights=true o es de peso libre, su progresión de carga es idéntica para ambas sedes. El campo "weight" que devuelvas son los kg para la sede activa (${activeGymLocation}).
 6. Historial de gimnasio: ${JSON.stringify(recentGymLogs)}.
 7. Fatiga y deportes extra: ${JSON.stringify(recentExtras)}.
-8. Catálogo permitido para esta sede: ${JSON.stringify(availableCatalogForGym)}.
+8. FICHA DE LOS EJERCICIOS PERMITIDOS en esta sede. Cada ficha incluye su estímulo (rol, patrón de movimiento, músculo principal, secundarios y qué aporta), series, rango de repeticiones, tempo, RPE objetivo, carga de referencia, última sesión, sesiones sin mejora y la decisión recomendada por la app a partir del historial: ${JSON.stringify(briefs.list)}.
 9. Plan actual del usuario (series, repeticiones y cargas que está usando ahora; úsalo como punto de partida de la progresión): ${JSON.stringify(currentPlan)}.
 10. Evolución por ejercicio en las últimas 8 semanas (fecha, sede, mejor serie, RPE y sensación): ${JSON.stringify(progressSummary)}.
 11. Series semanales hechas por grupo muscular (últimas 4 semanas; el último valor es la semana en curso). Equilibra el volumen y corrige descompensaciones: ${JSON.stringify(weeklySets)}.
-12. Sugerencias de progresión calculadas por reglas a partir de las últimas sesiones (úsalas como referencia, ajusta si el contexto lo pide): ${JSON.stringify(ruleSuggestions)}.
+12. PROGRESIÓN COMO UN ENTRENADOR (doble progresión). Para cada ejercicio decide con datos, nunca al azar:
+   - Mientras "repsActuales" esté por debajo del tope de "rangoReps", la progresión es subir repeticiones manteniendo la carga (normalmente +1 rep; +2 si el RPE real quedó claramente por debajo del objetivo).
+   - Cuando se alcanza el tope del rango con todas las series completadas y el RPE real igual o inferior al objetivo, sube la carga un "incrementoKg" y vuelve al mínimo del rango.
+   - Si faltaron repeticiones o el RPE real superó el objetivo, mantén. Si hubo fallo antes de lo previsto o la sensación fue "Muy Pesada" de forma repetida, baja un incremento.
+   - "decisionRecomendada" es el cálculo objetivo de la app con el historial. Puedes ser MÁS conservador (mantener) pero NUNCA más agresivo que ella. Si "sin_datos", mantén la carga (0 si no hay referencia); las repeticiones las eliges tú dentro de "rangoReps" y las series pueden variar ±1.
+   - Las repeticiones siempre dentro de "rangoReps". Las series pueden variar como máximo ±1 respecto a las actuales, solo para corregir el volumen de un grupo infraestimulado o sobrecargado.
+13. ESCALA DE CARGAS (OBLIGATORIO). Una subida no vale lo mismo en un ejercicio de 100 kg que en uno de 5 kg: el salto es PROPORCIONAL a la carga (aprox. 5 %, redondeado a pasos prácticos) y viene indicado en "incrementoKg" de cada ficha. Nunca apliques un salto fijo igual para todos. Si "cargaReferenciaKg" es nulo, NO inventes un peso: devuelve "weight": 0. El "weight" es para la sede activa (${activeGymLocation}).
+14. Respeta el "tempo" y el "rpeObjetivo" de cada ficha (RPE 6-7 = 3-4 reps en reserva, 8 = 2, 9 = 1, 10 = fallo). Compara el RPE real de la última sesión con el objetivo: si terminó con más reserva de la prevista y cumplió todo, hay margen para progresar; si terminó más cerca del fallo de lo previsto o no cumplió repeticiones, no progreses.
+15. DATOS DE LA SEMANA A EVALUAR (últimos 7 días frente a los 7 anteriores): ${JSON.stringify(weekReview)}.
+   Con ellos rellena "weeklyReview" con un análisis honesto y concreto del progreso de ESA semana: cumplimiento (entrenamientos hechos frente a los planificados), cambios de carga y repeticiones por ejercicio con números, RPE real frente al objetivo, series por grupo muscular frente a la media de las 3 semanas previas, grupos sin trabajar, récords y fatiga por actividades extra. Basa TODO únicamente en estos datos, cita cifras reales y no inventes nada. Si esa semana no hay entrenamientos o hay pocos datos, dilo claramente en "resumen" y deja las listas con lo poco que se pueda afirmar.
+
+16. VARIACIÓN CON CRITERIO (nada de cambiar por cambiar):
+   - Un ejercicio se mantiene mientras progresa. Solo se sustituye si "estancado" es true (3 o más sesiones sin mejora) o si ya no está disponible en esta sede. Los compuestos principales se mantienen salvo estancamiento prolongado; la variación empieza por aislamientos y accesorios.
+   - Un sustituto debe ser del MISMO grupo muscular y cubrir el mismo patrón o músculo principal aportando un estímulo distinto en algo concreto (ángulo, curva de resistencia, unilateral/bilateral, más estiramiento, menor estabilidad...), comparando "patron", "musculoPrincipal" y "estimulo" de las fichas. Indica el ejercicio que sale en "reemplazaA" y en "motivo" qué estímulo cambia y por qué.
+   - Máximo ${ctx.maxSubs} sustituciones en toda la semana (aplica cuando el plan actual tiene ${targetWeekDays} sesiones; si cambia el número de días, estructura libremente).
+   - Si un grupo está infraestimulado, corrígelo con una serie extra o recolocando ejercicios que ya existen, no sustituyendo ejercicios que funcionan.
+17. Cada ejercicio de la respuesta lleva "decision" (subir_peso, subir_reps, mantener, bajar o nuevo) y "motivo": una frase con datos reales (por ejemplo "Completó 3×10 a RPE 8, objetivo 9 → +1 rep dentro del rango 8-12"). "reemplazaA" solo si es un ejercicio nuevo que sustituye a otro del plan actual; si no, null.
+18. PUNTO DE PARTIDA: ${freshStart ? 'Las fichas están "sin_datos" y las cargas a 0 (el usuario las irá anotando al entrenar). Diseña la semana completa: elige ejercicios del catálogo con criterio (equilibrio entre grupos y patrones de movimiento, compuestos antes que aislamientos), prescribe series y repeticiones dentro de "rangoReps" (compuestos pesados hacia la parte baja del rango, aislamientos hacia la alta), respeta tempo y rpeObjetivo y devuelve "weight": 0 en todos. En "phaseExplanation" explica cómo estructuras la semana y qué debe vigilar al anotar sus cargas. En "weeklyReview" di claramente que aún no hay datos de entrenamiento y limítate a lo que sí consta.' : 'No es una primera semana: aplica las reglas anteriores.'}
 
 Responde ÚNICAMENTE con un JSON con esta estructura exacta:
 {
+  "weeklyReview": {
+    "resumen": "2-4 frases: cómo fue la semana y la tendencia general",
+    "queHaVisto": ["Observaciones concretas con números, p. ej. 'Press de Pecho en Máquina: 40→45 kg manteniendo 3×10'"],
+    "fortalezas": ["Qué está funcionando y por qué"],
+    "debilidades": ["Qué se está quedando atrás (ejercicios estancados, grupos con pocas series, reps incumplidas, fatiga)"],
+    "enfoque": ["Dónde esforzarte más la próxima semana, de forma accionable"]
+  },
   "phaseExplanation": "Explicación táctica del bloque (acumulación/sobrecarga/descarga) y cómo se estructuran los ${targetWeekDays} días",
   "sessions": [
     {
@@ -2025,9 +2150,12 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
         {
           "name": "Nombre exacto del catálogo",
           "sets": 4,
-          "reps": 8,
+          "reps": 9,
           "weight": 60,
           "tempo": "3-1-1-0",
+          "decision": "subir_reps",
+          "motivo": "Completó 4×8 a RPE 8 con objetivo 9 → +1 rep dentro del rango 8-12",
+          "reemplazaA": null,
           "notes": "Foco en control"
         }
       ]
@@ -2037,7 +2165,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
 
       try {
         let plan = await callGeminiJson(prompt);
-        let v = validateAiPlan(plan, availableCatalogForGym, lockedItems, targetWeekDays);
+        let v = validateAiPlan(plan, availableCatalogForGym, lockedItems, targetWeekDays, ctx, false);
 
         // Un reintento corrigiendo los errores detectados
         if (v.problems.length) {
@@ -2045,11 +2173,13 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
           const retryPrompt = prompt + `\n\nTU RESPUESTA ANTERIOR TENÍA ERRORES. CORRÍGELOS TODOS Y DEVUELVE EL JSON COMPLETO DE NUEVO:\n- ${v.problems.join('\n- ')}\n\nRespuesta anterior: ${JSON.stringify(plan)}`;
           try {
             plan = await callGeminiJson(retryPrompt);
-            v = validateAiPlan(plan, availableCatalogForGym, lockedItems, targetWeekDays);
           } catch (retryErr) {
             console.warn("Reintento fallido, se repara el primer plan:", retryErr);
           }
         }
+
+        // Pasada final: corrige lo que siga mal (por ejemplo, sustituciones sin justificar)
+        v = validateAiPlan(plan, availableCatalogForGym, lockedItems, targetWeekDays, ctx, true);
 
         if (!v.clean.sessions.length) throw new Error("La IA no devolvió un plan válido");
 
@@ -2061,6 +2191,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
         if (v.unknown.length) {
           warnings.push(`Se descartaron ejercicios que no están en tu catálogo para ${activeGymLocation}: ${v.unknown.join(', ')}.`);
         }
+        (v.notes || []).forEach(n => warnings.push(n));
         v.missingLocked.forEach(item => {
           const target = v.clean.sessions.reduce((a, b) => (b.exercises.length < a.exercises.length ? b : a));
           const cur = findCurrentSessionExercise(item);
@@ -2071,6 +2202,9 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
             reps: cur?.reps ?? item.defaultReps ?? 10,
             weight: cur?.weights?.[activeGymLocation] ?? item.weights?.[activeGymLocation] ?? 0,
             tempo: cur?.tempo || item.tempo || '3-1-1-0',
+            targetRpe: item.targetRpe || null,
+            decision: 'mantener',
+            motivo: 'Ejercicio bloqueado: se mantiene.',
             notes: 'Ejercicio bloqueado (añadido automáticamente)'
           });
           warnings.push(`"${item.name}" está bloqueado y la IA no lo había incluido: lo he añadido a "${target.name}".`);
@@ -2100,6 +2234,22 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
       textEl.textContent = proposal.phaseExplanation || "Propuesta de periodización calculada.";
       container.innerHTML = '';
 
+      if (proposal.weeklyReview) {
+        const rv = proposal.weeklyReview;
+        const block = (icon, title, items, cls) => (items && items.length)
+          ? `<div class="space-y-0.5"><div class="font-bold ${cls}">${icon} ${title}</div>${items.map(i => `<div class="pl-1 text-slate-700">• ${escapeHtml(i)}</div>`).join('')}</div>`
+          : '';
+        const reviewDiv = document.createElement('div');
+        reviewDiv.className = "bg-white border border-indigo-200 p-3 rounded-xl text-[11px] space-y-2 leading-relaxed";
+        reviewDiv.innerHTML = `<div class="font-bold text-indigo-800 text-xs flex items-center gap-1.5"><i class="fa-solid fa-clipboard-check"></i> Resumen de tu semana</div>` +
+          (rv.resumen ? `<div class="text-slate-700">${escapeHtml(rv.resumen)}</div>` : '') +
+          block('👀', 'Lo que he visto', rv.queHaVisto, 'text-slate-800') +
+          block('💪', 'Fortalezas', rv.fortalezas, 'text-emerald-700') +
+          block('⚠️', 'Debilidades', rv.debilidades, 'text-rose-700') +
+          block('🎯', 'Dónde esforzarte más', rv.enfoque, 'text-amber-700');
+        container.appendChild(reviewDiv);
+      }
+
       if (proposal.warnings && proposal.warnings.length) {
         const warnDiv = document.createElement('div');
         warnDiv.className = "bg-rose-50 border border-rose-200 text-rose-800 p-2.5 rounded-xl text-[11px] space-y-1";
@@ -2113,10 +2263,24 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
           const sessDiv = document.createElement('div');
           sessDiv.className = "bg-white/80 p-2.5 rounded-xl border border-amber-200 text-xs space-y-1.5";
           
+          const DEC = {
+            subir_peso: ['↑ Peso', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+            subir_reps: ['↑ Reps', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+            mantener: ['= Igual', 'bg-slate-50 text-slate-600 border-slate-200'],
+            bajar: ['↓ Baja', 'bg-rose-50 text-rose-700 border-rose-200'],
+            nuevo: ['↔ Nuevo', 'bg-violet-50 text-violet-700 border-violet-200']
+          };
           let exercisesHtml = (s.exercises || []).map(e => {
-            return `<div class="flex justify-between items-center text-[11px] py-0.5 border-b border-slate-100 last:border-0">
-              <span class="font-semibold text-slate-800">${escapeHtml(e.name)}</span>
-              <span class="text-indigo-600 font-bold">${e.sets}×${e.reps} • ${e.weight}kg</span>
+            const d = DEC[e.decision] || DEC.mantener;
+            return `<div class="text-[11px] py-1 border-b border-slate-100 last:border-0 space-y-0.5">
+              <div class="flex justify-between items-center gap-2">
+                <span class="font-semibold text-slate-800">${escapeHtml(e.name)}</span>
+                <span class="text-indigo-600 font-bold shrink-0">${e.sets}×${e.reps} • ${e.weight}kg${e.targetRpe ? ' • RPE ' + escapeHtml(e.targetRpe) : ''}</span>
+              </div>
+              <div class="flex items-start gap-1.5 text-[10px] text-slate-500 leading-snug">
+                <span class="border ${d[1]} px-1 py-0 rounded font-bold shrink-0">${d[0]}</span>
+                <span>${e.antes ? 'antes ' + escapeHtml(e.antes) + (e.motivo ? ' · ' : '') : ''}${e.reemplazaA ? 'sustituye a ' + escapeHtml(e.reemplazaA) + (e.motivo ? ' · ' : '') : ''}${escapeHtml(e.motivo || '')}</span>
+              </div>
             </div>`;
           }).join('');
 
@@ -2192,6 +2356,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
             weights: { CEN: wCen, POL: wPol },
             syncWeights: isSync,
             tempo: propEx.tempo || (catItem ? catItem.tempo : "3-1-1-0"),
+            targetRpe: catItem ? (catItem.targetRpe || null) : null,
             isLocked: catItem ? !!catItem.isLocked : false,
             status: 'pending',
             sensation: 'Adecuada',
@@ -2248,7 +2413,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
       const session = getActiveSession();
       const ctx = buildCoachContext();
       const historyText = coachHistory.slice(-6).map(m => `${m.role === 'user' ? 'Usuario' : 'Coach'}: ${m.text}`).join('\n');
-      const prompt = `Eres un entrenador personal certificado y analista de rendimiento. Responde en español, de forma clara y concreta (unas 180 palabras como máximo salvo que pidan más), basándote en los DATOS REALES del usuario. Si los datos no bastan para responder con seguridad, dilo.
+      const prompt = `Eres un entrenador personal certificado y analista de rendimiento. Responde en español, de forma clara y concreta (unas 180 palabras como máximo salvo que pidan más), basándote en los DATOS REALES del usuario. Si los datos no bastan para responder con seguridad, dilo. Si propones subir carga o repeticiones, sigue la doble progresión de las fichas: primero repeticiones dentro de "rangoReps" y, al llegar al tope con RPE dentro del objetivo, subir "incrementoKg" (el salto es proporcional a la carga). Nunca contradigas "decisionRecomendada" yendo más allá, y nunca inventes un peso si no hay "cargaReferenciaKg". Para cambiar un ejercicio, justifícalo (por ejemplo "estancado") y propón otro del mismo grupo con un estímulo distinto, comparando "patron", "musculoPrincipal" y "estimulo".
 DATOS DEL USUARIO: ${JSON.stringify(ctx)}
 CONVERSACIÓN PREVIA:
 ${historyText || '(ninguna)'}
@@ -2309,7 +2474,7 @@ PREGUNTA ACTUAL: "${text}"`;
                 ${item.syncWeights ? `<span title="Mismo peso en CEN y POL" class="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-semibold"><i class="fa-solid fa-rotate mr-0.5"></i>Sync</span>` : ''}
                 ${item.isLocked ? `<span title="Bloqueado (inamovible para la IA)" class="text-[10px] text-amber-500"><i class="fa-solid fa-lock"></i></span>` : ''}
               </div>
-              <div class="text-[10px] text-slate-500">${item.group} • ${item.defaultSets}×${item.defaultReps} • CEN: ${item.weights?.CEN || 0}kg / POL: ${item.weights?.POL || 0}kg</div>
+              <div class="text-[10px] text-slate-500">${item.group} • ${item.defaultSets}×${item.defaultReps}${(() => { const rr = getRepRange(item); return rr ? ' (' + rr.min + '-' + rr.max + ')' : ''; })()}${item.tempo ? ' • ' + escapeHtml(item.tempo) : ''}${item.targetRpe ? ' • 🎯 RPE ' + escapeHtml(item.targetRpe) : ''} • ${((item.weights?.CEN || 0) + (item.weights?.POL || 0)) > 0 ? `CEN: ${item.weights?.CEN || 0}kg / POL: ${item.weights?.POL || 0}kg` : 'sin carga de referencia'}</div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <span class="text-[9px] px-1.5 py-0.5 rounded font-bold ${item.inCen ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-400'}">CEN</span>
@@ -2367,8 +2532,17 @@ PREGUNTA ACTUAL: "${text}"`;
       const inCen = document.getElementById('newCatCen').checked;
       const inPol = document.getElementById('newCatPol').checked;
       const isLocked = document.getElementById('newCatLocked').checked;
+      const tempoInput = document.getElementById('newCatTempo').value.trim();
+      const targetRpe = document.getElementById('newCatRpe').value || null;
+      const repMinVal = parseInt(document.getElementById('newCatRepMin').value);
+      const repMaxVal = parseInt(document.getElementById('newCatRepMax').value);
+      const hasRange = repMinVal > 0 && repMaxVal >= repMinVal;
 
       if (!name) return;
+      if ((Number.isFinite(repMinVal) || Number.isFinite(repMaxVal)) && !hasRange) {
+        showToast("El rango de repeticiones no es válido (mínimo ≤ máximo).", "error");
+        return;
+      }
 
       const dupIdx = allowedCatalog.findIndex((c, i) => normName(c.name) === normName(name) && i !== editingCatalogIdx);
       if (dupIdx !== -1) {
@@ -2379,6 +2553,7 @@ PREGUNTA ACTUAL: "${text}"`;
       if (editingCatalogIdx !== null && allowedCatalog[editingCatalogIdx]) {
         const target = allowedCatalog[editingCatalogIdx];
         const oldW = { CEN: target.weights?.CEN ?? 0, POL: target.weights?.POL ?? 0 };
+        const oldTempo = target.tempo || '';
         target.name = name;
         target.group = group;
         target.defaultSets = sets;
@@ -2388,8 +2563,12 @@ PREGUNTA ACTUAL: "${text}"`;
         target.inCen = inCen;
         target.inPol = inPol;
         target.isLocked = isLocked;
+        target.tempo = tempoInput || target.tempo || "3-1-1-0";
+        target.targetRpe = targetRpe;
+        if (hasRange) { target.repMin = repMinVal; target.repMax = repMaxVal; } else { delete target.repMin; delete target.repMax; }
         const weightsChanged = oldW.CEN !== wCen || oldW.POL !== wPol;
-        const updatedCount = propagateCatalogChange(target, weightsChanged);
+        const tempoChanged = oldTempo !== target.tempo;
+        const updatedCount = propagateCatalogChange(target, weightsChanged, tempoChanged);
         localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
         resetCatalogForm();
         saveMainState();
@@ -2402,7 +2581,9 @@ PREGUNTA ACTUAL: "${text}"`;
         id: "cat_" + Date.now(),
         name, group, type: "reps",
         defaultSets: sets, defaultReps: reps,
-        tempo: "3-1-1-0",
+        tempo: tempoInput || "3-1-1-0",
+        targetRpe,
+        ...(hasRange ? { repMin: repMinVal, repMax: repMaxVal } : {}),
         weights: { CEN: wCen, POL: wPol },
         syncWeights: syncWeights,
         inCen, inPol, isLocked
@@ -2417,7 +2598,7 @@ PREGUNTA ACTUAL: "${text}"`;
 
     // Propaga a las sesiones los cambios hechos en el catálogo (enlace por id).
     // Los pesos solo se tocan si se han cambiado en el catálogo, para no pisar la progresión.
-    function propagateCatalogChange(item, weightsChanged) {
+    function propagateCatalogChange(item, weightsChanged, tempoChanged = false) {
       let count = 0;
       workoutSessions.forEach(sess => {
         (sess.exercises || []).forEach(ex => {
@@ -2426,6 +2607,8 @@ PREGUNTA ACTUAL: "${text}"`;
           ex.group = item.group;
           ex.syncWeights = !!item.syncWeights;
           ex.isLocked = !!item.isLocked;
+          ex.targetRpe = item.targetRpe || null;
+          if (tempoChanged) ex.tempo = item.tempo;
           if (weightsChanged) {
             ex.weights = { CEN: item.weights?.CEN ?? 0, POL: item.weights?.POL ?? 0 };
           } else if (item.syncWeights) {
@@ -2468,6 +2651,10 @@ PREGUNTA ACTUAL: "${text}"`;
       document.getElementById('newCatWeightPol').value = item.weights?.POL ?? 0;
       document.getElementById('newCatSyncWeights').checked = !!item.syncWeights;
       document.getElementById('newCatLocked').checked = !!item.isLocked;
+      document.getElementById('newCatTempo').value = item.tempo || '';
+      document.getElementById('newCatRpe').value = item.targetRpe || '';
+      document.getElementById('newCatRepMin').value = item.repMin || '';
+      document.getElementById('newCatRepMax').value = item.repMax || '';
       document.getElementById('newCatCen').checked = !!item.inCen;
       document.getElementById('newCatPol').checked = !!item.inPol;
       document.getElementById('catFormTitle').textContent = 'Editar Ejercicio del Catálogo';
@@ -2486,6 +2673,10 @@ PREGUNTA ACTUAL: "${text}"`;
         document.getElementById(id).value = '';
       });
       document.getElementById('newCatGroup').value = 'Pecho';
+      document.getElementById('newCatTempo').value = '';
+      document.getElementById('newCatRpe').value = '8';
+      document.getElementById('newCatRepMin').value = '';
+      document.getElementById('newCatRepMax').value = '';
       document.getElementById('newCatSyncWeights').checked = true;
       document.getElementById('newCatLocked').checked = false;
       document.getElementById('newCatCen').checked = true;
@@ -2780,10 +2971,14 @@ PREGUNTA ACTUAL: "${text}"`;
     }
 
     // Historial cronológico (de más antiguo a más reciente) de la mejor serie de un ejercicio
-    function getExerciseHistory(name, gym = 'ALL') {
+    function logsForAi() {
+      return progressBaseline ? workoutLogs.filter(l => logDateKey(l) >= progressBaseline) : workoutLogs;
+    }
+
+    function getExerciseHistory(name, gym = 'ALL', allTime = false) {
       const out = [];
       const target = normName(name);
-      [...workoutLogs].reverse().forEach(log => {
+      [...(allTime ? workoutLogs : logsForAi())].reverse().forEach(log => {
         if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) return;
         if (gym !== 'ALL' && (log.location || 'CEN') !== gym) return;
         const d = log.exercisesDetail.find(x => normName(x.name) === target);
@@ -2825,14 +3020,14 @@ PREGUNTA ACTUAL: "${text}"`;
     }
 
     // ---- Series semanales por grupo muscular ----
-    function computeWeeklySetsByGroup(weeks = 4) {
+    function computeWeeklySetsByGroup(weeks = 4, forAi = false) {
       const [ty, tm, td] = weekStartKey(getLocalDateString(new Date())).split('-').map(Number);
       const weekKeys = [];
       for (let i = weeks - 1; i >= 0; i--) {
         weekKeys.push(getLocalDateString(new Date(ty, tm - 1, td - 7 * i)));
       }
       const data = {};
-      workoutLogs.forEach(log => {
+      (forAi ? logsForAi() : workoutLogs).forEach(log => {
         if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) return;
         const wk = weekStartKey(logDateKey(log));
         if (!weekKeys.includes(wk)) return;
@@ -2850,7 +3045,7 @@ PREGUNTA ACTUAL: "${text}"`;
     }
 
     function computeWeeklySetsForAi(weeks = 4) {
-      const { weekKeys, data } = computeWeeklySetsByGroup(weeks);
+      const { weekKeys, data } = computeWeeklySetsByGroup(weeks, true);
       const series = {};
       Object.keys(data).forEach(g => { series[g] = weekKeys.map(wk => data[g][wk] || 0); });
       return { semanasInicioLunes: weekKeys, seriesHechasPorGrupo: series };
@@ -2858,7 +3053,7 @@ PREGUNTA ACTUAL: "${text}"`;
 
     // ---- Contexto para la IA ----
     function getCompactGymLogs(n = 12) {
-      return workoutLogs.filter(l => !l.isExtraActivity).slice(0, n).map(l => ({
+      return logsForAi().filter(l => !l.isExtraActivity).slice(0, n).map(l => ({
         fecha: logDateKey(l),
         sesion: l.sessionName,
         sede: l.location || 'CEN',
@@ -2877,7 +3072,7 @@ PREGUNTA ACTUAL: "${text}"`;
     }
 
     function getCompactExtras(n = 8) {
-      return workoutLogs.filter(l => l.isExtraActivity).slice(0, n).map(l => ({
+      return logsForAi().filter(l => l.isExtraActivity).slice(0, n).map(l => ({
         fecha: logDateKey(l),
         actividad: l.activityType || l.sessionName,
         fatiga: l.fatigueLevel,
@@ -2924,14 +3119,15 @@ PREGUNTA ACTUAL: "${text}"`;
         sesionActiva: getActiveSession(),
         planActual: workoutSessions.map(sess => ({
           nombre: sess.name,
-          ejercicios: (sess.exercises || []).map(e => ({ nombre: e.name, series: e.sets, reps: e.reps, pesos: e.weights, tempo: e.tempo }))
+          ejercicios: (sess.exercises || []).map(e => ({ nombre: e.name, series: e.sets, reps: e.reps, pesos: e.weights, tempo: e.tempo, rpeObjetivo: getTargetRpe(e) }))
         })),
-        catalogoDisponible: availableCatalog.map(c => ({ nombre: c.name, grupo: c.group, bloqueado: !!c.isLocked, pesos: c.weights })),
+        fichasEjercicios: buildExerciseBriefs(availableCatalog).list,
+        ejerciciosBloqueados: availableCatalog.filter(c => c.isLocked).map(c => c.name),
+        semanaEvaluada: buildWeekReviewData(),
         historialReciente: getCompactGymLogs(12),
         actividadesExtra: getCompactExtras(8),
         evolucionPorEjercicio: buildProgressSummary(8),
-        seriesSemanalesPorGrupo: computeWeeklySetsForAi(4),
-        sugerenciasProgresion: buildRuleSuggestions()
+        seriesSemanalesPorGrupo: computeWeeklySetsForAi(4)
       };
     }
 
@@ -2941,7 +3137,7 @@ PREGUNTA ACTUAL: "${text}"`;
       const gym = ex.syncWeights ? 'ALL' : activeGymLocation;
       const target = normName(ex.name);
       let entry = null;
-      for (const log of workoutLogs) {
+      for (const log of logsForAi()) {
         if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) continue;
         if (gym !== 'ALL' && (log.location || 'CEN') !== gym) continue;
         const d = log.exercisesDetail.find(x => normName(x.name) === target && x.status === 'completed');
@@ -2961,22 +3157,44 @@ PREGUNTA ACTUAL: "${text}"`;
       const currentReps = parseInt(ex.reps) || targetReps;
       const sens = entry.sensation || 'Adecuada';
       const rpe = String(entry.rpe || '8');
-      const reason = `${sens} · RPE ${rpe}${allRepsHit ? '' : ' · faltaron reps'}`;
+      const targetRpe = getTargetRpe(ex);
+      const reason = `${sens} · RPE ${rpe}${targetRpe ? ' (obj. ' + targetRpe + ')' : ''}${allRepsHit ? '' : ' · faltaron reps'}`;
 
       let action = 'keep';
-      if (sens === 'Fallo') {
+      const targetIsFailure = targetRpe && rpeToNum(targetRpe) >= 10;
+      if (sens === 'Fallo' && !targetIsFailure) {
+        // Si el objetivo ya es llegar al fallo, sentir "Fallo" es lo esperado y no obliga a bajar
         action = 'down';
-      } else if (allSetsDone && allRepsHit && (sens === 'Ligera' || rpe === '6-7' || (sens === 'Adecuada' && rpe === '8'))) {
-        action = 'up';
+      } else if (targetRpe && !allRepsHit && rpeToNum(rpe) > rpeToNum(targetRpe)) {
+        action = 'down';
+      } else if (allSetsDone && allRepsHit) {
+        if (targetRpe) {
+          // Con RPE objetivo: sube si terminaste con igual o más reserva de la prevista
+          if (sens !== 'Muy Pesada' && sens !== 'Fallo' && (sens === 'Ligera' || rpeToNum(rpe) <= rpeToNum(targetRpe))) action = 'up';
+        } else if (sens === 'Ligera' || rpe === '6-7' || (sens === 'Adecuada' && rpe === '8')) {
+          action = 'up';
+        }
       }
 
+      const range = getRepRange(ex);
+      const unit = isTime ? ' s' : ' reps';
+      const stepR = isTime ? 5 : 1;
+
       if (!isTime && lastWeight > 0) {
-        const stepW = lastWeight >= 100 ? 5 : (lastWeight >= 20 ? 2.5 : 1);
-        const upW = lastWeight + stepW;
-        const downW = Math.max(0, lastWeight - stepW);
+        const stepW = progressionStep(lastWeight);
+        const upW = Math.round((lastWeight + stepW) * 100) / 100;
+        const downW = Math.max(0, Math.round((lastWeight - stepW) * 100) / 100);
         if (action === 'up') {
+          if (range && targetReps < range.max) {
+            // Doble progresión: primero repeticiones dentro del rango, con la misma carga
+            const bump = rpeToNum(rpe) <= rpeToNum(targetRpe || '8') - 2 ? 2 : 1;
+            const nr = Math.min(range.max, targetReps + bump);
+            if (currentReps >= nr) return null;
+            return { action, mode: 'reps', reps: nr, weight: lastWeight, text: `Sube a ${nr} reps (rango ${range.min}-${range.max})`, reason };
+          }
           if (currentWeight >= upW) return null;
-          return { action, mode: 'weight', weight: upW, text: `Sube a ${upW} kg`, reason };
+          const resetReps = range ? range.min : null;
+          return { action, mode: 'weight', weight: upW, reps: resetReps, text: `Sube a ${upW} kg${resetReps ? ' y vuelve a ' + resetReps + ' reps' : ''}`, reason };
         }
         if (action === 'down') {
           if (currentWeight <= downW) return null;
@@ -2986,8 +3204,6 @@ PREGUNTA ACTUAL: "${text}"`;
         return { action, mode: 'weight', weight: currentWeight, text: `Mantén ${currentWeight} kg`, reason };
       }
 
-      const unit = isTime ? ' s' : ' reps';
-      const stepR = isTime ? 5 : 1;
       if (action === 'up') {
         const nr = targetReps + stepR;
         if (currentReps >= nr) return null;
@@ -3011,6 +3227,7 @@ PREGUNTA ACTUAL: "${text}"`;
       if (sg.mode === 'weight') {
         const base = ex.weights || { CEN: ex.weight || 0, POL: ex.weight || 0 };
         ex.weights = ex.syncWeights ? { CEN: sg.weight, POL: sg.weight } : { ...base, [activeGymLocation]: sg.weight };
+        if (sg.reps != null) ex.reps = sg.reps;
       } else {
         ex.reps = sg.reps;
       }
@@ -3252,7 +3469,7 @@ PREGUNTA ACTUAL: "${text}"`;
     function computePRs(gym) {
       const out = [];
       getLoggedExerciseNames().forEach(displayName => {
-        const hist = getExerciseHistory(displayName, gym);
+        const hist = getExerciseHistory(displayName, gym, true);
         if (!hist.length) return;
         const isTime = hist[0].type === 'time';
         const allBody = hist.every(h => h.weight === 0);
@@ -3267,7 +3484,7 @@ PREGUNTA ACTUAL: "${text}"`;
       const name = document.getElementById('progressExerciseSelect').value;
       const gym = document.getElementById('progressGymSelect').value;
       const metric = document.getElementById('progressMetricSelect').value;
-      const hist = name ? getExerciseHistory(name, gym) : [];
+      const hist = name ? getExerciseHistory(name, gym, true) : [];
 
       const isTime = hist.length > 0 && hist[0].type === 'time';
       const allBody = hist.length > 0 && hist.every(h => h.weight === 0);
@@ -3392,6 +3609,561 @@ PREGUNTA ACTUAL: "${text}"`;
       }
     }
 
+    // ================= Estímulo por ejercicio, doble progresión y fichas para la IA =================
+    // [nombre, rol, patrón de movimiento, músculo principal, secundarios, qué estímulo aporta]
+    const EXERCISE_INFO = {};
+    [
+      ["Press de Banca Plano", "compuesto", "empuje horizontal", "pectoral mayor (medio)", "tríceps, deltoide anterior", "Barra: máxima carga absoluta y mayor fatiga sistémica; base de fuerza del empuje"],
+      ["Press Inclinado Mancuernas", "compuesto", "empuje inclinado", "pectoral clavicular (superior)", "deltoide anterior, tríceps", "Mancuernas: más recorrido y estiramiento, y trabajo independiente de cada lado"],
+      ["Fondos en Paralelas", "compuesto", "empuje (fondos)", "pectoral inferior y tríceps", "deltoide anterior", "Peso corporal; inclinar el tronco carga más pecho y verticalizar carga más tríceps"],
+      ["Aperturas en Polea", "aislamiento", "aperturas", "pectoral", "deltoide anterior", "Tensión constante del cable, perfil de resistencia distinto al peso libre"],
+      ["Dominadas Pronas", "compuesto", "tracción vertical", "dorsal ancho", "bíceps, romboides, trapecio inferior", "Peso corporal con gran recorrido; tracción vertical exigente"],
+      ["Remo con Barra", "compuesto", "tracción horizontal", "espalda media y dorsal", "bíceps, erectores", "Mucha carga con alta demanda de estabilidad lumbar"],
+      ["Remo Gironda en Polea", "compuesto", "tracción horizontal", "espalda media y dorsal", "bíceps", "Cable: tensión constante y apoyo estable, menos fatiga lumbar que el remo con barra"],
+      ["Jalón al Pecho", "compuesto", "tracción vertical", "dorsal ancho", "bíceps", "Tracción vertical regulable, permite progresar en saltos pequeños"],
+      ["Sentadilla Trasera con Barra", "compuesto", "dominante de rodilla", "cuádriceps y glúteo", "erectores, core", "Máxima carga del tren inferior; gran fatiga sistémica"],
+      ["Peso Muerto Rumano (RDL)", "compuesto", "bisagra de cadera", "isquiosurales y glúteo", "erectores", "Carga excéntrica con los isquios en estiramiento; fuerte demanda lumbar"],
+      ["Prensa de Piernas 45°", "compuesto", "dominante de rodilla", "cuádriceps y glúteo", "", "Mucha carga con poca demanda de equilibrio y de espalda"],
+      ["Press Militar Barra", "compuesto", "empuje vertical", "deltoide anterior", "deltoide medio, tríceps, core", "Empuje vertical de pie; exige estabilidad de tronco"],
+      ["Elevaciones Laterales", "aislamiento", "abducción de hombro", "deltoide medio", "trapecio superior", "Aislamiento para la anchura del hombro; con mancuernas la tensión cae al inicio del recorrido"],
+      ["Face Pulls Polea", "aislamiento", "tracción alta / rotación externa", "deltoide posterior y manguito rotador", "trapecio medio", "Salud del hombro y deltoide posterior con cargas ligeras"],
+      ["Curl Bíceps Barra Z", "aislamiento", "flexión de codo", "bíceps braquial", "braquial, antebrazo", "Barra Z: menos estrés en la muñeca, carga bilateral"],
+      ["Extensiones Tríceps Polea", "aislamiento", "extensión de codo", "tríceps", "", "Tensión constante del cable"],
+      ["Plancha Abdominal", "aislamiento", "anti-extensión (isométrico)", "recto abdominal y transverso", "glúteo, hombro", "Isométrico por tiempo"],
+      ["Press de Pecho en Máquina", "compuesto", "empuje horizontal", "pectoral mayor", "tríceps, deltoide anterior", "Trayectoria guiada y estable: permite acercarse al fallo con poca fatiga sistémica"],
+      ["Press Inclinado en Máquina", "compuesto", "empuje inclinado", "pectoral clavicular (superior)", "deltoide anterior, tríceps", "Guiado, con énfasis en el pecho superior"],
+      ["Press Pecho con Mancuernas", "compuesto", "empuje horizontal", "pectoral mayor", "tríceps, deltoide anterior", "Más recorrido y estiramiento que la máquina, con mayor estabilización"],
+      ["Pec Deck (Aperturas en Máquina)", "aislamiento", "aperturas", "pectoral", "deltoide anterior", "Tensión continua con el pecho en estiramiento, casi sin tríceps"],
+      ["Jalón Agarre Neutro en Máquina", "compuesto", "tracción vertical", "dorsal ancho", "bíceps, braquial", "Agarre neutro: recorrido cómodo con más énfasis en el dorsal inferior"],
+      ["Remo Sentado en Máquina", "compuesto", "tracción horizontal", "espalda media y dorsal", "bíceps, deltoide posterior", "Guiado y estable"],
+      ["Remo en Máquina Apoyado en Pecho", "compuesto", "tracción horizontal", "espalda media (romboides, trapecio)", "dorsal, bíceps", "El apoyo en el pecho elimina balanceo y carga lumbar"],
+      ["Pullover en Máquina", "aislamiento", "extensión de hombro", "dorsal ancho", "tríceps (cabeza larga), pectoral", "Dorsal en estiramiento sin intervención del bíceps, tensión continua"],
+      ["Hiperextensiones en Máquina", "aislamiento", "extensión de tronco", "erectores lumbares", "glúteo, isquiosurales", "Cadena posterior con poca carga axial"],
+      ["Peso Muerto", "compuesto", "bisagra de cadera", "cadena posterior (glúteo, isquios, erectores)", "dorsal, trapecio, antebrazo", "Máxima carga total; fatiga sistémica alta"],
+      ["Zancada con Mancuernas", "compuesto", "zancada unilateral", "cuádriceps y glúteo", "isquiosurales, core", "Unilateral: corrige asimetrías, glúteo en estiramiento y exige estabilidad"],
+      ["Hack Squat en Máquina", "compuesto", "dominante de rodilla", "cuádriceps", "glúteo", "Recorrido profundo y guiado, más rodilla-dominante que la prensa"],
+      ["Extensión de Cuádriceps en Máquina", "aislamiento", "extensión de rodilla", "cuádriceps (recto femoral)", "", "Único que carga el recto femoral en acortamiento"],
+      ["Curl Femoral Sentado", "aislamiento", "flexión de rodilla", "isquiosurales", "gemelos", "Cadera flexionada: isquios en posición alargada, gran estímulo de crecimiento"],
+      ["Curl Femoral Tumbado", "aislamiento", "flexión de rodilla", "isquiosurales", "gemelos", "Cadera extendida: más tensión con el músculo acortado"],
+      ["Hip Thrust en Máquina", "compuesto", "extensión de cadera", "glúteo mayor", "isquiosurales", "Máxima tensión del glúteo en acortamiento"],
+      ["Patada de Glúteo en Máquina", "aislamiento", "extensión de cadera", "glúteo mayor", "isquiosurales", "Unilateral, aísla el glúteo"],
+      ["Abductores en Máquina", "aislamiento", "abducción de cadera", "glúteo medio", "tensor de la fascia lata", "Aislamiento del glúteo medio"],
+      ["Aductores en Máquina", "aislamiento", "aducción de cadera", "aductores", "", "Aislamiento de la cara interna del muslo"],
+      ["Gemelos en Máquina de Pie", "aislamiento", "elevación de talones", "gastrocnemio", "sóleo", "Rodilla extendida: prioriza el gastrocnemio"],
+      ["Gemelos en Máquina Sentado", "aislamiento", "elevación de talones", "sóleo", "gastrocnemio", "Rodilla flexionada: prioriza el sóleo"],
+      ["Press de Hombro en Máquina", "compuesto", "empuje vertical", "deltoide anterior y medio", "tríceps", "Guiado y estable"],
+      ["Elevaciones Laterales en Máquina", "aislamiento", "abducción de hombro", "deltoide medio", "", "Tensión constante en todo el recorrido"],
+      ["Pec Deck Invertido (Deltoides Posterior)", "aislamiento", "extensión horizontal de hombro", "deltoide posterior", "romboides, trapecio medio", "Aislamiento del deltoide posterior"],
+      ["Curl de Bíceps en Máquina", "aislamiento", "flexión de codo", "bíceps braquial", "braquial", "Apoyo fijo: evita el balanceo"],
+      ["Extensión de Tríceps en Máquina", "aislamiento", "extensión de codo", "tríceps", "", "Guiado y estable"],
+      ["Fondos en Máquina (Tríceps)", "compuesto", "empuje (fondos)", "tríceps", "pectoral inferior, deltoide anterior", "Permite cargar mucho el tríceps sin estabilizar el cuerpo"],
+      ["Abdominales en Máquina", "aislamiento", "flexión de tronco", "recto abdominal", "", "Carga progresiva sobre el abdomen"],
+      ["Rotación de Tronco en Máquina", "aislamiento", "rotación de tronco", "oblicuos", "", "Carga rotacional guiada"]
+    ].forEach(r => { EXERCISE_INFO[normName(r[0])] = { rol: r[1], patron: r[2], musculoPrincipal: r[3], secundarios: r[4], estimulo: r[5] }; });
+
+    function getExerciseInfo(cat) {
+      return cat ? (cat.info || EXERCISE_INFO[normName(cat.name)] || null) : null;
+    }
+
+    function getCatalogFor(ex) {
+      if (!ex) return null;
+      return allowedCatalog.find(c => ex.catalogId && c.id === ex.catalogId) || allowedCatalog.find(c => normName(c.name) === normName(ex.name)) || null;
+    }
+
+    // Rango de repeticiones del ejercicio (explícito en el catálogo o derivado de sus reps por defecto)
+    function getRepRange(item) {
+      const cat = (item && item.defaultReps !== undefined) ? item : getCatalogFor(item);
+      if (!cat) return null;
+      const base = Number(cat.defaultReps) || 10;
+      const mn = Number(cat.repMin);
+      const mx = Number(cat.repMax);
+      if (mn > 0 && mx >= mn) return { min: mn, max: mx, explicit: true };
+      if ((cat.type || 'reps') === 'time') {
+        return { min: Math.max(5, Math.round((base * 0.75) / 5) * 5), max: Math.round((base * 1.5) / 5) * 5, explicit: false };
+      }
+      const pad = base <= 6 ? [1, 1] : (base <= 11 ? [2, 2] : (base === 12 ? [2, 3] : [3, 5]));
+      return { min: Math.max(1, base - pad[0]), max: base + pad[1], explicit: false };
+    }
+
+    function pseudoExerciseFor(cat) {
+      const cur = findCurrentSessionExercise(cat);
+      return {
+        name: cat.name, catalogId: cat.id, type: cat.type || 'reps', group: cat.group,
+        sets: cur?.sets ?? cat.defaultSets ?? 3,
+        reps: cur?.reps ?? cat.defaultReps ?? 10,
+        weights: cur?.weights ?? cat.weights ?? { CEN: 0, POL: 0 },
+        syncWeights: cat.syncWeights, status: 'pending',
+        tempo: cur?.tempo || cat.tempo,
+        _inPlan: !!cur
+      };
+    }
+
+    // Estancamiento: sesiones consecutivas recientes sin superar la mejor marca (1RM estimado o repeticiones)
+    function computeStall(name, gym) {
+      const hist = getExerciseHistory(name, gym);
+      if (hist.length < 3) return { sesiones: hist.length, sinMejora: 0, estancado: false };
+      const isTime = hist[0].type === 'time';
+      const allBody = hist.every(h => h.weight === 0);
+      const val = h => (isTime || allBody) ? h.reps : h.e1rm;
+      let best = -Infinity;
+      let lastImprove = 0;
+      hist.forEach((h, i) => { if (val(h) > best + 0.01) { best = val(h); lastImprove = i; } });
+      const sinMejora = hist.length - 1 - lastImprove;
+      return { sesiones: hist.length, sinMejora, estancado: sinMejora >= 3 };
+    }
+
+    // Ficha de cada ejercicio para la IA (estímulo + progresión) y datos internos para validar su respuesta
+    function buildExerciseBriefs(items) {
+      const list = [];
+      const map = new Map();
+      items.forEach(c => {
+        const ex = pseudoExerciseFor(c);
+        const isTime = (c.type || 'reps') === 'time';
+        const gymKey = c.syncWeights ? 'ALL' : activeGymLocation;
+        const hist = getExerciseHistory(c.name, gymKey);
+        const last = hist.length ? hist[hist.length - 1] : null;
+        const stall = computeStall(c.name, gymKey);
+        const range = getRepRange(c);
+        const info = getExerciseInfo(c);
+        const ref = isTime ? 0 : referenceLoad(c);
+        const step = ref > 0 ? progressionStep(ref) : 0;
+        const planW = Number(ex.weights?.[activeGymLocation] ?? 0) || 0;
+        const sg = getProgressionSuggestion(ex);
+
+        let rec;
+        if (!last) rec = { accion: 'sin_datos', texto: 'Sin sesiones registradas: mantén carga y repeticiones actuales' };
+        else if (!sg) rec = { accion: 'mantener', texto: 'El plan actual ya refleja la última progresión: mantén' };
+        else if (sg.action === 'up') rec = { accion: sg.mode === 'weight' ? 'subir_peso' : 'subir_reps', peso: sg.mode === 'weight' ? sg.weight : undefined, reps: sg.reps ?? undefined, texto: sg.text, motivo: sg.reason };
+        else if (sg.action === 'down') rec = { accion: 'bajar', peso: sg.mode === 'weight' ? sg.weight : undefined, reps: sg.mode === 'reps' ? sg.reps : undefined, texto: sg.text, motivo: sg.reason };
+        else rec = { accion: 'mantener', texto: sg.text, motivo: sg.reason };
+
+        list.push({
+          ejercicio: c.name,
+          grupo: c.group,
+          rol: info?.rol, patron: info?.patron, musculoPrincipal: info?.musculoPrincipal,
+          secundarios: info?.secundarios || undefined, estimulo: info?.estimulo,
+          series: ex.sets,
+          rangoReps: range ? `${range.min}-${range.max}` : null,
+          repsActuales: ex.reps,
+          tempo: ex.tempo || c.tempo,
+          rpeObjetivo: c.targetRpe || null,
+          cargaReferenciaKg: ref > 0 ? ref : null,
+          incrementoKg: step > 0 ? step : null,
+          ultimaSesion: last ? `${formatEntry(last)}${last.rpe ? ' · RPE ' + last.rpe : ''}${last.sensation ? ' · ' + last.sensation : ''} (${formatShortDate(last.date)})` : null,
+          sesionesRegistradas: stall.sesiones,
+          sesionesSinMejora: stall.sinMejora,
+          estancado: stall.estancado,
+          enElPlanActual: ex._inPlan,
+          decisionRecomendada: rec
+        });
+        map.set(c.id, { ref, step, planW, range, rec, estancado: stall.estancado, inPlan: ex._inPlan, curReps: Number(ex.reps) || (c.defaultReps || 10), curSets: Number(ex.sets) || (c.defaultSets || 3), tempo: ex.tempo || c.tempo });
+      });
+      return { list, map };
+    }
+
+    // Convierte lo que propone la IA en una entrada válida, sin permitirle ir más lejos que el historial
+    function buildPlanEntry(cat, e, ctx) {
+      const b = ctx.briefMap.get(cat.id) || null;
+      const notes = [];
+      const isTime = (cat.type || 'reps') === 'time';
+      const accion = b ? b.rec.accion : 'sin_datos';
+      const range = b ? b.range : getRepRange(cat);
+      const curReps = b ? b.curReps : (cat.defaultReps || 10);
+      const curSets = b ? b.curSets : (cat.defaultSets || 3);
+      const planW = b ? b.planW : 0;
+      const ref = b ? b.ref : (isTime ? 0 : referenceLoad(cat));
+      const recTxt = b ? b.rec.texto : 'sin datos recientes';
+
+      // Series: ±1 respecto a las actuales, entre 1 y 6
+      let sets = parseInt(e.sets);
+      if (!Number.isFinite(sets)) sets = curSets;
+      sets = Math.min(6, Math.max(1, Math.min(curSets + 1, Math.max(curSets - 1, sets))));
+
+      // Repeticiones: dentro del rango y sin subir más de lo que respalda el historial
+      let reps = parseInt(e.reps);
+      if (!Number.isFinite(reps) || reps < 1) reps = curReps;
+      const proposedReps = reps;
+      if (range) reps = Math.min(range.max, Math.max(range.min, reps));
+      let repsCap = curReps;
+      if (accion === 'sin_datos' && range) repsCap = range.max; // sin historial no hay carga que proteger: las reps se eligen dentro del rango
+      if (accion === 'subir_reps' && b.rec.reps != null) repsCap = Math.max(curReps, b.rec.reps);
+      if (accion === 'bajar' && b.rec.reps != null) repsCap = Math.min(curReps, b.rec.reps);
+      if (range) repsCap = Math.min(range.max, Math.max(range.min, repsCap));
+      if (reps > repsCap) {
+        reps = repsCap;
+        notes.push(`${cat.name}: la IA proponía ${proposedReps} reps y se queda en ${reps} (decisión recomendada: ${recTxt}).`);
+      }
+
+      // Peso: escala proporcional y sin subir más de lo que respalda el historial
+      let weight = 0;
+      let noBase = false;
+      if (!isTime) {
+        const rw = resolveProposedWeight(cat, e.weight);
+        weight = rw.weight;
+        noBase = !!rw.noBase;
+        const clampNote = rw.clamped ? `${cat.name}: la IA proponía ${rw.proposed} kg y se ha ajustado a ${rw.weight} kg (carga de referencia ${rw.base} kg; salto máximo razonable).` : null;
+        let capW = ref;
+        if (accion === 'subir_peso' && b.rec.peso != null) capW = b.rec.peso;
+        if (accion === 'bajar' && b.rec.peso != null) capW = Math.min(ref, b.rec.peso);
+        capW = Math.round(capW * 100) / 100;
+        if (weight > capW + 1e-9) {
+          const prop = Number.isFinite(rw.proposed) ? rw.proposed : weight;
+          weight = capW;
+          notes.push(`${cat.name}: la IA proponía ${prop} kg y se queda en ${weight} kg (decisión recomendada: ${recTxt}).`);
+        } else if (clampNote) {
+          notes.push(clampNote);
+        }
+      }
+
+      // Al subir la carga, las repeticiones vuelven al mínimo del rango (doble progresión)
+      if (accion === 'subir_peso' && b.rec.reps != null && weight > planW + 1e-9 && reps > b.rec.reps) {
+        notes.push(`${cat.name}: al subir la carga se vuelve a ${b.rec.reps} reps (la IA proponía ${reps}).`);
+        reps = b.rec.reps;
+      }
+
+      let decision;
+      if (!b || !b.inPlan) decision = 'nuevo';
+      else if (weight > planW + 1e-9) decision = 'subir_peso';
+      else if (weight < planW - 1e-9) decision = 'bajar';
+      else if (reps > curReps) decision = 'subir_reps';
+      else if (reps < curReps) decision = 'bajar';
+      else decision = 'mantener';
+
+      const motivo = String(e.motivo ?? '').replace(/\s+/g, ' ').trim().slice(0, 260);
+      return {
+        entry: {
+          catalogId: cat.id,
+          name: cat.name,
+          sets, reps, weight,
+          tempo: e.tempo || (b && b.tempo) || cat.tempo || '3-1-1-0',
+          targetRpe: cat.targetRpe || null,
+          notes: e.notes || '',
+          decision,
+          motivo,
+          reemplazaA: e.reemplazaA ? String(e.reemplazaA).slice(0, 120) : null,
+          antes: (b && b.inPlan) ? `${curSets}×${curReps}${isTime ? ' s' : ''}${isTime ? '' : ' · ' + planW + ' kg'}` : null
+        },
+        notes, noBase
+      };
+    }
+
+    // ================= Escala de cargas, RPE objetivo y catálogo base =================
+    // Cuadrícula práctica de cargas según el peso (discos / pines típicos)
+    function loadGrid(w) {
+      return w < 20 ? 0.5 : (w < 60 ? 1 : (w < 150 ? 2.5 : 5));
+    }
+
+    function roundToGrid(w) {
+      const g = loadGrid(w);
+      return Math.round(Math.round(w / g) * g * 100) / 100;
+    }
+
+    // Subida semanal normal: ~5 % de la carga, redondeada a la cuadrícula, nunca menos de un paso
+    function progressionStep(w) {
+      const g = loadGrid(w);
+      const raw = Math.round((w * 0.05) / g) * g;
+      return Math.round(Math.max(g, raw) * 100) / 100;
+    }
+
+    function rpeToNum(r) {
+      return String(r) === '6-7' ? 6.5 : (parseFloat(r) || 8);
+    }
+
+    function rpeHint(r) {
+      return ({ '6-7': '3-4 reps en reserva', '8': '2 reps en reserva', '9': '1 rep en reserva', '10': 'al fallo' })[String(r)] || '';
+    }
+
+    function getTargetRpe(ex) {
+      if (!ex) return null;
+      if (ex.targetRpe) return ex.targetRpe;
+      const cat = allowedCatalog.find(c => c.id === ex.catalogId) || allowedCatalog.find(c => normName(c.name) === normName(ex.name));
+      return (cat && cat.targetRpe) ? cat.targetRpe : null;
+    }
+
+    // Carga de referencia: la mayor entre la del plan actual y la última realmente levantada
+    function referenceLoad(cat) {
+      const cur = findCurrentSessionExercise(cat);
+      const planW = Number(cur?.weights?.[activeGymLocation] ?? cur?.weight ?? cat.weights?.[activeGymLocation] ?? 0) || 0;
+      const hist = getExerciseHistory(cat.name, cat.syncWeights ? 'ALL' : activeGymLocation);
+      const lastW = hist.length ? hist[hist.length - 1].weight : 0;
+      return Math.max(planW, lastW);
+    }
+
+    function buildLoadScale(items) {
+      const out = [];
+      items.forEach(c => {
+        if (c.type === 'time') return;
+        const ref = referenceLoad(c);
+        if (!(ref > 0)) return;
+        const step = progressionStep(ref);
+        out.push({
+          ejercicio: c.name,
+          cargaReferenciaKg: ref,
+          incrementoKg: step,
+          maxKg: roundToGrid(ref + 2 * step),
+          minKg: roundToGrid(ref * 0.8)
+        });
+      });
+      return out;
+    }
+
+    // Limita y redondea el peso propuesto por la IA según la escala del ejercicio
+    function resolveProposedWeight(cat, proposed) {
+      if ((cat.type || 'reps') === 'time') return { weight: 0 };
+      const base = referenceLoad(cat);
+      const p = parseFloat(proposed);
+      if (!(base > 0)) return { weight: 0, base: 0, noBase: true };
+      if (!Number.isFinite(p) || p < 0) return { weight: base, base };
+      const step = progressionStep(base);
+      const maxW = base + 2 * step;
+      const minW = base * 0.8;
+      const limited = Math.min(Math.max(p, minW), maxW);
+      const rounded = roundToGrid(limited);
+      const clamped = Math.abs(limited - p) > 1e-9;
+      return { weight: rounded, base, clamped, proposed: p };
+    }
+
+    // ---- Resumen de la semana para la IA ----
+    function countDoneSetsByGroup(logs) {
+      const out = {};
+      logs.forEach(log => (log.exercisesDetail || []).forEach(d => {
+        let n = 0;
+        if (Array.isArray(d.setsDetail) && d.setsDetail.length) n = d.setsDetail.filter(s => s.done).length;
+        else if (d.status === 'completed') n = parseInt(d.sets) || 0;
+        if (!n) return;
+        const g = resolveGroup(d);
+        out[g] = (out[g] || 0) + n;
+      }));
+      return out;
+    }
+
+    function buildWeekReviewData() {
+      const today = new Date();
+      const d0 = new Date(today); d0.setDate(today.getDate() - 6);
+      const p0 = new Date(today); p0.setDate(today.getDate() - 13);
+      const curFrom = getLocalDateString(d0);
+      const curTo = getLocalDateString(today);
+      const prevFrom = getLocalDateString(p0);
+
+      const gymLogs = logsForAi().filter(l => !l.isExtraActivity);
+      const cur = gymLogs.filter(l => { const k = logDateKey(l); return k >= curFrom && k <= curTo; });
+      const prev = gymLogs.filter(l => { const k = logDateKey(l); return k >= prevFrom && k < curFrom; });
+      const p3 = new Date(today); p3.setDate(today.getDate() - 27);
+      const prev3From = getLocalDateString(p3);
+      const prev3Logs = gymLogs.filter(l => { const k = logDateKey(l); return k >= prev3From && k < curFrom; });
+      const curSets = countDoneSetsByGroup(cur);
+      const prev3Sets = countDoneSetsByGroup(prev3Logs);
+      const baseGroups = ['Pecho', 'Espalda', 'Pierna', 'Hombro', 'Bíceps', 'Tríceps', 'Core'];
+      const seriesPorGrupo = {};
+      [...new Set([...baseGroups, ...Object.keys(curSets), ...Object.keys(prev3Sets)])].forEach(g => {
+        seriesPorGrupo[g] = { estaSemana: curSets[g] || 0, mediaSemanasPrevias: Math.round(((prev3Sets[g] || 0) / 3) * 10) / 10 };
+      });
+      const extras = logsForAi().filter(l => l.isExtraActivity).filter(l => { const k = logDateKey(l); return k >= curFrom && k <= curTo; });
+
+      const byEx = new Map();
+      [...cur].reverse().forEach(log => (log.exercisesDetail || []).forEach(d => {
+        const k = normName(d.name);
+        if (!byEx.has(k)) byEx.set(k, { name: d.name, items: [] });
+        byEx.get(k).items.push(d);
+      }));
+
+      const score = b => b.weight * 1000 + b.reps;
+      const exercises = [];
+      byEx.forEach(({ name, items }) => {
+        const done = items.filter(d => d.status === 'completed');
+        let best = null;
+        let lastD = null;
+        done.forEach(d => {
+          const b = bestSetOf(d);
+          if (b && (!best || score(b) > score(best))) best = b;
+          lastD = d;
+        });
+        const before = getExerciseHistory(name).filter(h => h.date < curFrom);
+        const prevBest = before.length ? before.reduce((a, b) => score(b) > score(a) ? b : a) : null;
+        const typ = lastD?.type || 'reps';
+        const cat = allowedCatalog.find(c => normName(c.name) === normName(name));
+
+        let cumplioReps = null;
+        if (lastD) {
+          const target = parseInt(lastD.reps) || 0;
+          const sets = Array.isArray(lastD.setsDetail) ? lastD.setsDetail.filter(s => s.done) : [];
+          cumplioReps = sets.length ? (sets.length >= (parseInt(lastD.sets) || sets.length) && sets.every(s => (Number(s.reps) || 0) >= target)) : null;
+        }
+
+        const plannedSets = items.reduce((a, d) => a + (parseInt(d.sets) || 0), 0);
+        const doneSetsCount = items.reduce((a, d) => a + ((Array.isArray(d.setsDetail) && d.setsDetail.length) ? d.setsDetail.filter(s => s.done).length : (d.status === 'completed' ? (parseInt(d.sets) || 0) : 0)), 0);
+        const row = {
+          ejercicio: name,
+          grupo: resolveGroup(items[items.length - 1]),
+          estado: items.every(d => d.status === 'skipped') ? 'omitido' : (done.length ? 'completado' : 'pendiente'),
+          vecesRealizado: done.length,
+          omitidoOPendiente: items.length - done.length,
+          seriesHechas: doneSetsCount,
+          seriesPlanificadas: plannedSets,
+          notas: lastD?.notes || undefined,
+          mejorSerieEstaSemana: best ? formatEntry({ type: typ, weight: best.weight, reps: best.reps }) : null,
+          mejorSerieAnterior: prevBest ? formatEntry(prevBest) : null,
+          cumplioTodasLasSeriesYReps: cumplioReps,
+          rpeObjetivo: cat?.targetRpe || null,
+          rpeReal: lastD?.rpe || null,
+          sensacion: lastD?.sensation || null
+        };
+        if (best && prevBest) {
+          if (best.weight > 0 || prevBest.weight > 0) {
+            const dk = Math.round((best.weight - prevBest.weight) * 100) / 100;
+            row.cambioKg = dk;
+            row.cambioPorcentaje = prevBest.weight > 0 ? Math.round((dk / prevBest.weight) * 1000) / 10 : null;
+          } else {
+            row.cambioReps = best.reps - prevBest.reps;
+          }
+          row.nuevoRecord = score(best) > score(prevBest);
+        }
+        exercises.push(row);
+      });
+
+      const vol = logs => Math.round(logs.reduce((a, l) => a + (Number(l.volume) || computeLogVolume(l.exercisesDetail || [])), 0));
+
+      return {
+        periodoEvaluado: `${curFrom} a ${curTo}`,
+        entrenamientosPlanificadosPorSemana: workoutSessions.length,
+        entrenamientosEstaSemana: cur.length,
+        entrenamientosSemanaAnterior: prev.length,
+        volumenTotalKgEstaSemana: vol(cur),
+        volumenTotalKgSemanaAnterior: vol(prev),
+        sesiones: cur.map(l => ({ fecha: logDateKey(l), sesion: l.sessionName, sede: l.location || 'CEN' })),
+        seriesPorGrupo,
+        gruposSinTrabajarEstaSemana: baseGroups.filter(g => !(curSets[g] > 0)),
+        ejercicios: exercises.slice(0, 30),
+        actividadesExtra: extras.map(l => ({ fecha: logDateKey(l), actividad: l.activityType || l.sessionName, fatiga: l.fatigueLevel, notas: l.notes || undefined }))
+      };
+    }
+
+    function sanitizeReview(r) {
+      if (!r || typeof r !== 'object') return null;
+      const str = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+      const list = v => (Array.isArray(v) ? v : []).map(x => str(x, 300)).filter(Boolean).slice(0, 6);
+      const out = {
+        resumen: str(r.resumen, 600),
+        queHaVisto: list(r.queHaVisto),
+        fortalezas: list(r.fortalezas),
+        debilidades: list(r.debilidades),
+        enfoque: list(r.enfoque)
+      };
+      const hasContent = out.resumen || out.queHaVisto.length || out.fortalezas.length || out.debilidades.length || out.enfoque.length;
+      return hasContent ? out : null;
+    }
+
+    // ---- Catálogo base: máquinas (sin pesos de referencia) ----
+    // [nombre, grupo, series, reps, tempo, RPE objetivo, peso libre (sync entre sedes)]
+    const BASE_CATALOG = [
+      // [nombre, grupo, series, reps, tempo, RPE objetivo, peso libre]
+      ["Press de Pecho en Máquina", "Pecho", 3, 10, "3-1-1-0", "8", false],
+      ["Press Inclinado en Máquina", "Pecho", 3, 10, "3-1-1-0", "8", false],
+      ["Press Pecho con Mancuernas", "Pecho", 3, 8, "3-1-1-0", "8", true],
+      ["Press Inclinado Mancuernas", "Pecho", 3, 10, "3-1-1-0", "8", true],
+      ["Pec Deck (Aperturas en Máquina)", "Pecho", 3, 12, "2-1-1-1", "9", false],
+      ["Jalón al Pecho", "Espalda", 3, 10, "3-1-1-0", "8", false],
+      ["Jalón Agarre Neutro en Máquina", "Espalda", 3, 10, "3-1-1-0", "8", false],
+      ["Remo Sentado en Máquina", "Espalda", 3, 10, "2-1-1-1", "8", false],
+      ["Remo en Máquina Apoyado en Pecho", "Espalda", 3, 10, "2-1-1-1", "8", false],
+      ["Pullover en Máquina", "Espalda", 3, 12, "2-1-1-1", "9", false],
+      ["Hiperextensiones en Máquina", "Espalda", 3, 12, "2-1-1-0", "8", false],
+      ["Peso Muerto", "Pierna", 3, 5, "2-1-1-0", "8", true],
+      ["Zancada con Mancuernas", "Pierna", 3, 10, "2-0-1-0", "8", true],
+      ["Prensa de Piernas 45°", "Pierna", 3, 12, "3-1-1-0", "8", false],
+      ["Hack Squat en Máquina", "Pierna", 3, 10, "3-1-1-0", "8", false],
+      ["Extensión de Cuádriceps en Máquina", "Pierna", 3, 12, "2-1-1-1", "9", false],
+      ["Curl Femoral Sentado", "Pierna", 3, 12, "3-1-1-0", "9", false],
+      ["Curl Femoral Tumbado", "Pierna", 3, 12, "3-1-1-0", "9", false],
+      ["Hip Thrust en Máquina", "Pierna", 3, 10, "2-1-1-1", "8", false],
+      ["Patada de Glúteo en Máquina", "Pierna", 3, 12, "2-1-1-1", "9", false],
+      ["Abductores en Máquina", "Pierna", 3, 15, "2-1-1-1", "9", false],
+      ["Aductores en Máquina", "Pierna", 3, 15, "2-1-1-1", "9", false],
+      ["Gemelos en Máquina de Pie", "Pierna", 4, 12, "2-1-1-1", "9", false],
+      ["Gemelos en Máquina Sentado", "Pierna", 4, 15, "2-1-1-1", "9", false],
+      ["Press de Hombro en Máquina", "Hombro", 3, 10, "3-1-1-0", "8", false],
+      ["Elevaciones Laterales en Máquina", "Hombro", 3, 12, "2-0-1-1", "9", false],
+      ["Pec Deck Invertido (Deltoides Posterior)", "Hombro", 3, 15, "2-1-1-1", "9", false],
+      ["Curl de Bíceps en Máquina", "Bíceps", 3, 10, "3-0-1-1", "9", false],
+      ["Extensión de Tríceps en Máquina", "Tríceps", 3, 12, "2-0-1-1", "9", false],
+      ["Fondos en Máquina (Tríceps)", "Tríceps", 3, 10, "2-1-1-0", "8", false],
+      ["Abdominales en Máquina", "Core", 3, 15, "2-1-1-1", "9", false],
+      ["Rotación de Tronco en Máquina", "Core", 3, 12, "2-1-1-1", "8", false]
+    ];
+
+    function loadBaseCatalog() {
+      let added = 0;
+      let filled = 0;
+      let existing = 0;
+      BASE_CATALOG.forEach(([name, group, sets, reps, tempo, rpe, sync], i) => {
+        const found = allowedCatalog.find(c => normName(c.name) === normName(name));
+        if (found) {
+          existing++;
+          if (!found.targetRpe) { found.targetRpe = rpe; filled++; }
+          return;
+        }
+        allowedCatalog.push({
+          id: `cat_base_${i}_${normName(name).replace(/[^a-z0-9]+/g, '_')}`,
+          name, group, type: "reps",
+          defaultSets: sets, defaultReps: reps,
+          tempo, targetRpe: rpe,
+          weights: { CEN: 0, POL: 0 },
+          syncWeights: sync,
+          inCen: true, inPol: true, isLocked: false
+        });
+        added++;
+      });
+      localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+      saveMainState();
+      renderCatalogSettings();
+      showToast(added || filled
+        ? `Catálogo base: ${added} ejercicios añadidos${existing ? ` (${existing} ya existían${filled ? `, a ${filled} les he puesto el RPE objetivo` : ''})` : ''}`
+        : "El catálogo base ya estaba completo", "success");
+    }
+
+    // ---- Reinicio inicial automático (una sola vez) ----
+    // Guarda antes una copia del plan y del catálogo en la propia base de datos; el historial no se toca.
+    async function runInitialReset() {
+      if (resetInProgress || !db || !currentUser) return;
+      resetInProgress = true;
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'userWorkouts', 'backupBeforeReset'), {
+          sessions: workoutSessions,
+          allowedCatalog: allowedCatalog,
+          savedAt: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error("No se pudo guardar la copia previa al reinicio:", err);
+        showToast("No se pudo guardar la copia previa; el reinicio se intentará de nuevo al abrir la app.", "error");
+        resetInProgress = false;
+        renderAll();
+        return;
+      }
+
+      workoutSessions.forEach(sess => (sess.exercises || []).forEach(ex => {
+        const cat = getCatalogFor(ex);
+        ex.weights = { CEN: 0, POL: 0 };
+        if (ex.weight !== undefined) ex.weight = 0;
+        if (cat) {
+          if (cat.defaultSets != null) ex.sets = cat.defaultSets;
+          if (cat.defaultReps != null) ex.reps = cat.defaultReps;
+        }
+        ex.status = 'pending';
+        ex.sensation = 'Adecuada';
+        ex.rpe = '8';
+        ex.setsLog = [];
+        ensureExerciseSetsLog(ex);
+      }));
+      allowedCatalog.forEach(c => { c.weights = { CEN: 0, POL: 0 }; });
+      progressBaseline = getLocalDateString(new Date());
+      initialResetDone = true;
+      linkExercisesToCatalog();
+      localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+      resetInProgress = false;
+      saveMainState();
+      showToast("Plan reiniciado: pesos a 0 y series/reps del catálogo. Ya puedes pedir al Coach que planifique la semana.", "success");
+    }
+
     // Funciones en window
     window.setGymLocation = setGymLocation;
     window.toggleLoginModal = toggleLoginModal;
@@ -3445,6 +4217,7 @@ PREGUNTA ACTUAL: "${text}"`;
     window.setRestTimerPreset = setRestTimerPreset;
     window.toggleRestTimerRunning = toggleRestTimerRunning;
     window.showToast = showToast;
+    window.loadBaseCatalog = loadBaseCatalog;
     window.openProgressModal = openProgressModal;
     window.closeProgressModal = closeProgressModal;
     window.renderProgressView = renderProgressView;
@@ -3484,6 +4257,8 @@ PREGUNTA ACTUAL: "${text}"`;
           geminiApiKey = null;
           workoutSessions = [];
           workoutLogs = [];
+          progressBaseline = null;
+          initialResetDone = false;
           if (unsubscribeMainState) { unsubscribeMainState(); unsubscribeMainState = null; }
           if (unsubscribeLogs) { unsubscribeLogs(); unsubscribeLogs = null; }
           document.getElementById('authenticatedApp').classList.add('hidden');
@@ -3546,12 +4321,19 @@ PREGUNTA ACTUAL: "${text}"`;
       unsubscribeMainState = onSnapshot(stateDocRef, (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
+          progressBaseline = data.progressBaseline || null;
+          initialResetDone = data.initialResetV1 === true;
           if (data.sessions && Array.isArray(data.sessions)) {
             workoutSessions = data.sessions;
           }
           if (data.allowedCatalog && Array.isArray(data.allowedCatalog)) {
             allowedCatalog = data.allowedCatalog;
             localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+          }
+          // Reinicio automático (una sola vez): solo con datos confirmados por el servidor
+          if (!docSnap.metadata.fromCache && !initialResetDone && !resetInProgress) {
+            runInitialReset();
+            return;
           }
           if (linkExercisesToCatalog()) {
             saveMainState();
@@ -3571,6 +4353,7 @@ PREGUNTA ACTUAL: "${text}"`;
               ]
             }
           ];
+          initialResetDone = true; // cuenta nueva: nada que reiniciar
           saveMainState();
         }
       });
@@ -3593,6 +4376,8 @@ PREGUNTA ACTUAL: "${text}"`;
         setDoc(stateDocRef, {
           sessions: workoutSessions,
           allowedCatalog: allowedCatalog,
+          ...(progressBaseline ? { progressBaseline } : {}),
+          ...(initialResetDone ? { initialResetV1: true } : {}),
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(err => console.error("Error guardando:", err));
       }
