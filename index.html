@@ -2417,7 +2417,10 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
 DATOS DEL USUARIO: ${JSON.stringify(ctx)}
 CONVERSACIÓN PREVIA:
 ${historyText || '(ninguna)'}
-PREGUNTA ACTUAL: "${text}"`;
+PREGUNTA ACTUAL: "${text}"
+
+CAMBIOS EN LA APP: puedes cargar un plan de entrenamiento en la app del usuario, pero SOLO si en la pregunta actual pide crear, cargar, modificar o ajustar su rutina o sus sesiones. En ese caso devuelve en "plan" el plan COMPLETO resultante (todas las sesiones, también las que no cambian), usando exclusivamente nombres EXACTOS de "fichasEjercicios" (los disponibles en la sede activa), sin repetir un ejercicio dentro de la misma sesión, con "sets", "reps" (dentro de "rangoReps"), "weight" en kg (0 si no hay "cargaReferenciaKg"), "tempo" y "motivo". El usuario verá el plan y pulsará un botón para aplicarlo: no digas que ya está aplicado, di que puede aplicarlo con el botón. Si la pregunta es solo una consulta o conversación, pon "plan": null.
+Responde ÚNICAMENTE con un JSON: {"respuesta": "texto para el usuario", "plan": null o {"phaseExplanation": "breve", "sessions": [{"name": "Día 1: ...", "exercises": [{"name": "...", "sets": 3, "reps": 10, "weight": 0, "tempo": "3-1-1-0", "motivo": "..."}]}]}}`;
 
       const key = String(geminiApiKey).trim();
       const apiUrl = geminiUrl(key);
@@ -2426,18 +2429,34 @@ PREGUNTA ACTUAL: "${text}"`;
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const result = await response.json();
-        const reply = result.candidates?.[0]?.content?.parts?.[0]?.text || "No pude generar respuesta.";
-        coachHistory.push({ role: 'user', text }, { role: 'coach', text: reply });
+        const rawReply = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        let reply = '';
+        let rawPlan = null;
+        try {
+          let t = rawReply.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+          const a = t.indexOf('{'), z = t.lastIndexOf('}');
+          if (a !== -1 && z > a) t = t.slice(a, z + 1);
+          const parsed = JSON.parse(t);
+          reply = String(parsed.respuesta || '').trim();
+          rawPlan = parsed.plan && Array.isArray(parsed.plan.sessions) ? parsed.plan : null;
+        } catch (parseErr) {
+          reply = rawReply.trim(); // si no vino en JSON, se muestra tal cual
+        }
+        if (!reply) reply = rawPlan ? "Te propongo este plan:" : "No pude generar respuesta.";
+
+        const proposal = rawPlan ? buildChatPlanProposal(rawPlan) : null;
+        coachHistory.push({ role: 'user', text }, { role: 'coach', text: reply + (proposal ? ' [Plan propuesto, pendiente de que el usuario lo aplique]' : '') });
 
         chatLog.removeChild(loadingBubble);
         const aiBubble = document.createElement('div');
         aiBubble.className = "bg-white border border-slate-200 text-slate-800 p-3 rounded-xl mr-6 leading-relaxed shadow-sm whitespace-pre-line";
         aiBubble.textContent = reply;
         chatLog.appendChild(aiBubble);
+        if (rawPlan) chatLog.appendChild(renderChatPlanCard(proposal));
       } catch (err) {
         if (loadingBubble.parentNode) chatLog.removeChild(loadingBubble);
         const errBubble = document.createElement('div');
@@ -2447,6 +2466,62 @@ PREGUNTA ACTUAL: "${text}"`;
       } finally {
         chatLog.scrollTop = chatLog.scrollHeight;
       }
+    }
+
+    // ---- Plan propuesto desde el chat del Coach ----
+    let chatPlanProposal = null;
+
+    // Valida el plan del chat con las mismas reglas de carga y repeticiones que el planificador
+    function buildChatPlanProposal(rawPlan) {
+      const available = allowedCatalog.filter(c => activeGymLocation === 'CEN' ? c.inCen : c.inPol);
+      const briefs = buildExerciseBriefs(available);
+      const ctx = { briefMap: briefs.map, groupSets: {}, planComparable: false, maxSubs: 2 };
+      const n = Array.isArray(rawPlan.sessions) ? rawPlan.sessions.length : 0;
+      const v = validateAiPlan(rawPlan, available, [], n, ctx, true);
+      const warnings = [];
+      if (v.unknown.length) warnings.push(`Se descartaron ejercicios que no están en tu catálogo para ${activeGymLocation}: ${v.unknown.join(', ')}.`);
+      (v.notes || []).forEach(x => warnings.push(x));
+      const used = new Set();
+      v.clean.sessions.forEach(sess => sess.exercises.forEach(e => used.add(e.catalogId)));
+      const lockedMissing = available.filter(c => c.isLocked && !used.has(c.id)).map(c => c.name);
+      if (lockedMissing.length) warnings.push(`Este plan no incluye ejercicios que tienes bloqueados: ${lockedMissing.join(', ')}.`);
+      v.clean.sessions = v.clean.sessions.filter(sess => sess.exercises.length > 0);
+      v.clean.warnings = warnings;
+      return v.clean.sessions.length ? v.clean : null;
+    }
+
+    function renderChatPlanCard(proposal) {
+      const card = document.createElement('div');
+      card.className = "bg-amber-50 border border-amber-200 p-3 rounded-xl mr-6 text-[11px] space-y-2";
+      if (!proposal) {
+        card.className = "bg-rose-50 text-rose-700 p-2.5 rounded-xl mr-6 text-xs";
+        card.textContent = "El plan propuesto no tenía ejercicios válidos de tu catálogo; no hay nada que aplicar. Prueba a pedirlo de nuevo.";
+        return card;
+      }
+      chatPlanProposal = proposal;
+      const sessHtml = proposal.sessions.map(sess => `
+        <div class="bg-white/80 p-2 rounded-lg border border-amber-100">
+          <div class="font-bold text-amber-900">📅 ${escapeHtml(sess.name)}</div>
+          ${sess.exercises.map(e => `<div class="flex justify-between gap-2 py-0.5"><span class="text-slate-800">${escapeHtml(e.name)}</span><span class="text-indigo-600 font-bold shrink-0">${e.sets}×${e.reps} • ${e.weight}kg</span></div>`).join('')}
+        </div>`).join('');
+      const warnHtml = (proposal.warnings || []).length
+        ? `<div class="bg-rose-50 border border-rose-200 text-rose-800 p-2 rounded-lg space-y-0.5">${proposal.warnings.map(w => `<div>• ${escapeHtml(w)}</div>`).join('')}</div>` : '';
+      card.innerHTML = `<div class="font-bold text-amber-900 text-xs flex items-center gap-1.5"><i class="fa-solid fa-clipboard-list"></i> Plan propuesto (${proposal.sessions.length} días)</div>${sessHtml}${warnHtml}
+        <button type="button" class="chat-apply-btn w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2"><i class="fa-solid fa-check"></i> Aplicar este plan a mi app</button>
+        <div class="text-[10px] text-slate-500 text-center">Sustituye tu plan actual por este.</div>`;
+      const btn = card.querySelector('.chat-apply-btn');
+      btn.addEventListener('click', () => {
+        if (!chatPlanProposal || btn.disabled) return;
+        if (!confirm("Esto sustituye tu plan actual por el propuesto. ¿Aplicarlo?")) return;
+        pendingAiProposal = chatPlanProposal;
+        applySelectedAiSuggestions();
+        btn.disabled = true;
+        btn.className = "w-full bg-slate-200 text-slate-500 font-bold py-2.5 rounded-xl";
+        btn.innerHTML = `<i class="fa-solid fa-check"></i> Plan aplicado`;
+        const modal = document.getElementById('coachModal');
+        if (modal) modal.classList.add('hidden');
+      });
+      return card;
     }
 
     function openSettingsModal() {
