@@ -2419,7 +2419,7 @@ CONVERSACIÓN PREVIA:
 ${historyText || '(ninguna)'}
 PREGUNTA ACTUAL: "${text}"
 
-CAMBIOS EN LA APP: puedes cargar un plan de entrenamiento en la app del usuario, pero SOLO si en la pregunta actual pide crear, cargar, modificar o ajustar su rutina o sus sesiones. En ese caso devuelve en "plan" el plan COMPLETO resultante (todas las sesiones, también las que no cambian), usando exclusivamente nombres EXACTOS de "fichasEjercicios" (los disponibles en la sede activa), sin repetir un ejercicio dentro de la misma sesión, con "sets", "reps" (dentro de "rangoReps"), "weight" en kg (0 si no hay "cargaReferenciaKg"), "tempo" y "motivo". El usuario verá el plan y pulsará un botón para aplicarlo: no digas que ya está aplicado, di que puede aplicarlo con el botón. Si la pregunta es solo una consulta o conversación, pon "plan": null.
+CAMBIOS EN LA APP: puedes cargar un plan de entrenamiento en la app del usuario, pero SOLO si en la pregunta actual pide crear, cargar, modificar o ajustar su rutina o sus sesiones. En ese caso devuelve en "plan" el plan COMPLETO resultante (todas las sesiones, también las que no cambian), usando exclusivamente nombres EXACTOS de "fichasEjercicios" (los disponibles en la sede activa), sin repetir un ejercicio dentro de la misma sesión, e INCLUYENDO OBLIGATORIAMENTE todos los de "ejerciciosBloqueados" en alguna sesión, con "sets", "reps" (dentro de "rangoReps"), "weight" en kg (0 si no hay "cargaReferenciaKg"), "tempo" y "motivo". El usuario verá el plan y pulsará un botón para aplicarlo: no digas que ya está aplicado, di que puede aplicarlo con el botón. Si la pregunta es solo una consulta o conversación, pon "plan": null.
 Responde ÚNICAMENTE con un JSON: {"respuesta": "texto para el usuario", "plan": null o {"phaseExplanation": "breve", "sessions": [{"name": "Día 1: ...", "exercises": [{"name": "...", "sets": 3, "reps": 10, "weight": 0, "tempo": "3-1-1-0", "motivo": "..."}]}]}}`;
 
       const key = String(geminiApiKey).trim();
@@ -2448,7 +2448,23 @@ Responde ÚNICAMENTE con un JSON: {"respuesta": "texto para el usuario", "plan":
         }
         if (!reply) reply = rawPlan ? "Te propongo este plan:" : "No pude generar respuesta.";
 
-        const proposal = rawPlan ? buildChatPlanProposal(rawPlan) : null;
+        let proposal = null;
+        if (rawPlan) {
+          let v = validateChatPlan(rawPlan);
+          if (v.missingLocked.length) {
+            // Primero se le pide al Coach que rediseñe las sesiones con los bloqueados dentro, con criterio
+            try {
+              const retry = await callGeminiJson(prompt + `\n\nTU PLAN ANTERIOR NO INCLUÍA ESTOS EJERCICIOS BLOQUEADOS (obligatorios): ${v.missingLocked.map(c => c.name).join(', ')}. Rediseña el plan completo integrándolos donde tengan sentido (en la sesión de su grupo muscular o patrón de movimiento, equilibrando el volumen de la sesión y quitando o reubicando ejercicios menos importantes si hace falta). Devuelve el JSON completo de nuevo.\nPlan anterior: ${JSON.stringify(rawPlan)}`);
+              if (retry && retry.plan && Array.isArray(retry.plan.sessions)) {
+                const v2 = validateChatPlan(retry.plan);
+                if (v2.missingLocked.length <= v.missingLocked.length) v = v2;
+              }
+            } catch (retryErr) {
+              console.warn("Reintento del plan del chat fallido:", retryErr);
+            }
+          }
+          proposal = finalizeChatPlan(v);
+        }
         coachHistory.push({ role: 'user', text }, { role: 'coach', text: reply + (proposal ? ' [Plan propuesto, pendiente de que el usuario lo aplique]' : '') });
 
         chatLog.removeChild(loadingBubble);
@@ -2472,7 +2488,7 @@ Responde ÚNICAMENTE con un JSON: {"respuesta": "texto para el usuario", "plan":
     let chatPlanProposal = null;
 
     // Valida el plan del chat con las mismas reglas de carga y repeticiones que el planificador
-    function buildChatPlanProposal(rawPlan) {
+    function validateChatPlan(rawPlan) {
       const available = allowedCatalog.filter(c => activeGymLocation === 'CEN' ? c.inCen : c.inPol);
       const briefs = buildExerciseBriefs(available);
       const ctx = { briefMap: briefs.map, groupSets: {}, planComparable: false, maxSubs: 2 };
@@ -2483,11 +2499,37 @@ Responde ÚNICAMENTE con un JSON: {"respuesta": "texto para el usuario", "plan":
       (v.notes || []).forEach(x => warnings.push(x));
       const used = new Set();
       v.clean.sessions.forEach(sess => sess.exercises.forEach(e => used.add(e.catalogId)));
-      const lockedMissing = available.filter(c => c.isLocked && !used.has(c.id)).map(c => c.name);
-      if (lockedMissing.length) warnings.push(`Este plan no incluye ejercicios que tienes bloqueados: ${lockedMissing.join(', ')}.`);
       v.clean.sessions = v.clean.sessions.filter(sess => sess.exercises.length > 0);
       v.clean.warnings = warnings;
-      return v.clean.sessions.length ? v.clean : null;
+      return { clean: v.clean, ctx, missingLocked: available.filter(c => c.isLocked && !used.has(c.id)) };
+    }
+
+    // Último recurso si el Coach sigue sin incluir un bloqueado: se coloca en la sesión del mismo grupo muscular
+    // (la que más trabaje ese grupo y, en empate, la más corta); solo si ninguna lo trabaja, en la más corta, avisando.
+    function finalizeChatPlan(v) {
+      const clean = v.clean;
+      if (!clean.sessions.length) return null;
+      v.missingLocked.forEach(item => {
+        const score = sess => sess.exercises.filter(e => {
+          const c = allowedCatalog.find(x => x.id === e.catalogId);
+          return c && c.group === item.group;
+        }).length;
+        let target = clean.sessions[0], best = -1;
+        clean.sessions.forEach(sess => {
+          const sc = score(sess);
+          if (sc > best || (sc === best && sess.exercises.length < target.exercises.length)) { best = sc; target = sess; }
+        });
+        const built = buildPlanEntry(item, { sets: item.defaultSets, reps: item.defaultReps, weight: 0, tempo: item.tempo }, v.ctx);
+        const cur = findCurrentSessionExercise(item);
+        if (cur) { built.entry.sets = cur.sets ?? built.entry.sets; built.entry.reps = cur.reps ?? built.entry.reps; built.entry.weight = cur.weights?.[activeGymLocation] ?? built.entry.weight; }
+        built.entry.decision = 'mantener';
+        built.entry.motivo = 'Ejercicio bloqueado: se mantiene.';
+        target.exercises.push(built.entry);
+        clean.warnings.push(best > 0
+          ? `"${item.name}" está bloqueado y el Coach no lo había incluido: lo he colocado en "${target.name}", que ya trabaja ${item.group}. Revisa el volumen de esa sesión.`
+          : `"${item.name}" está bloqueado y el Coach no lo había incluido; ninguna sesión trabaja ${item.group}, así que lo he puesto en "${target.name}" (la más corta). Conviene reubicarlo.`);
+      });
+      return clean;
     }
 
     function renderChatPlanCard(proposal) {
