@@ -2330,7 +2330,7 @@ Responde ÚNICAMENTE con un JSON con esta estructura exacta:
           let isSync = true;
 
           if (catItem) {
-            isSync = catItem.syncWeights ?? true;
+            isSync = !!catItem.syncWeights; // igual que lo que ves en el catálogo
             if (isSync) {
               wCen = propEx.weight ?? catItem.weights?.[activeGymLocation] ?? 0;
               wPol = wCen;
