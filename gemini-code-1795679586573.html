@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GymLog</title>
+
+  <link rel="manifest" href="./manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+    .hidden { display: none !important; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15, 23, 42, 0.5);
+      display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-full flex flex-col pb-12 select-none">
+
+  <!-- Toast discreto -->
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg"></div>
+
+  <!-- Cabecera -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div class="max-w-lg mx-auto px-3.5 py-2.5 flex justify-between items-center gap-2">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center text-sm">
+          <i class="fa-solid fa-dumbbell"></i>
+        </div>
+        <!-- Selector de sede -->
+        <div class="inline-flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs font-bold">
+          <button id="btnGymCen" onclick="setGymLocation('CEN')" class="px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm">CEN</button>
+          <button id="btnGymPol" onclick="setGymLocation('POL')" class="px-2.5 py-1 rounded-md text-slate-500">POL</button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <button onclick="openHistoryModal()" title="Historial" class="px-2.5 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5">
+          <i class="fa-solid fa-calendar-days"></i> Historial
+        </button>
+        <button onclick="openCatalogModal()" title="Base de datos de ejercicios" class="px-2.5 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5">
+          <i class="fa-solid fa-database"></i> Ejercicios
+        </button>
+        <button onclick="toggleLoginModal()" id="btnLoginIcon" title="Cuenta" class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center text-xs">
+          <i id="userHeaderIcon" class="fa-solid fa-user"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-lg mx-auto w-full px-3.5 pt-3.5 space-y-3.5 flex-1">
+
+    <!-- Pantalla sin sesión -->
+    <div id="unauthenticatedCard" class="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-3 mt-6">
+      <h2 class="text-base font-bold text-slate-900">Cuaderno de Entrenamiento</h2>
+      <p class="text-xs text-slate-500">Inicia sesión para cargar tus rutinas y sincronizar con Firestore.</p>
+      <button onclick="toggleLoginModal()" class="bg-slate-900 text-white font-bold px-4 py-2 rounded-xl text-xs">Iniciar Sesión</button>
+    </div>
+
+    <!-- App autenticada -->
+    <div id="authenticatedApp" class="space-y-3.5 hidden">
+
+      <!-- Pestañas de sesiones -->
+      <section class="bg-white rounded-xl p-2.5 border border-slate-200 space-y-2">
+        <div class="flex justify-between items-center px-0.5">
+          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Rutinas / Sesiones</span>
+          <div class="flex items-center gap-2">
+            <button onclick="deleteCurrentSession()" class="text-[11px] font-semibold text-rose-600 hover:underline">Borrar sesión</button>
+            <button onclick="openNewSessionModal()" class="text-[11px] font-bold text-indigo-600 hover:underline">+ Nueva</button>
+          </div>
+        </div>
+        <div id="sessionTabs" class="flex items-center gap-1.5 overflow-x-auto pb-0.5"></div>
+      </section>
+
+      <!-- Barra de acción de la sesión activa -->
+      <div class="flex items-center justify-between gap-2 px-0.5">
+        <div class="min-w-0">
+          <h1 id="activeSessionTitle" class="text-sm font-bold text-slate-900 truncate">Sesión</h1>
+          <p id="lastCompletedText" class="text-[11px] text-slate-400">Sin registrar aún</p>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button onclick="openAddExerciseModal()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 px-3 py-1.5 rounded-xl text-xs font-bold">
+            + Ejercicio
+          </button>
+          <button onclick="saveWorkoutSession()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm flex items-center gap-1.5">
+            <i class="fa-solid fa-check"></i> Guardar Sesión
+          </button>
+        </div>
+      </div>
+
+      <!-- Lista de ejercicios (Cuaderno) -->
+      <section id="exerciseList" class="space-y-2"></section>
+
+    </div>
+  </main>
+
+  <!-- Modal Login -->
+  <div id="loginModal" class="modal-backdrop hidden">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-bold">Cuenta</h3>
+        <button onclick="toggleLoginModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="loggedOutContent" class="space-y-2.5 text-xs">
+        <div id="authErrorMessage" class="hidden text-rose-600 bg-rose-50 p-2 rounded-lg"></div>
+        <input type="email" id="loginEmail" placeholder="Correo electrónico" class="w-full border border-slate-200 rounded-lg px-3 py-2">
+        <input type="password" id="loginPassword" placeholder="Contraseña" class="w-full border border-slate-200 rounded-lg px-3 py-2" onkeydown="if(event.key==='Enter') performLogin()">
+        <button onclick="performLogin()" id="btnLoginSubmit" class="w-full bg-slate-900 text-white py-2 rounded-lg font-bold">Entrar</button>
+      </div>
+      <div id="loggedInContent" class="hidden space-y-3 text-xs">
+        <p id="userEmailDisplay" class="font-mono text-slate-600 bg-slate-50 p-2 rounded-lg truncate"></p>
+        <button onclick="performLogout()" class="w-full bg-rose-50 text-rose-700 border border-rose-200 py-2 rounded-lg font-bold">Cerrar Sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Nueva Sesión -->
+  <div id="newSessionModal" class="modal-backdrop hidden">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-xs space-y-3 shadow-xl text-xs">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-bold">Nueva Sesión</h3>
+        <button onclick="closeNewSessionModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="text" id="newSessionNameInput" placeholder="Ej: Torso A, Pierna, Empuje..." class="w-full border border-slate-200 rounded-lg px-3 py-2" onkeydown="if(event.key==='Enter') createNewSession()">
+      <div class="flex justify-end gap-2">
+        <button onclick="closeNewSessionModal()" class="px-3 py-1.5 bg-slate-100 rounded-lg font-semibold">Cancelar</button>
+        <button onclick="createNewSession()" class="px-3 py-1.5 bg-slate-900 text-white rounded-lg font-bold">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Añadir Ejercicio a la Sesión -->
+  <div id="addExModal" class="modal-backdrop hidden">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3 shadow-xl text-xs">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <h3 class="text-sm font-bold">Añadir Ejercicio a la Sesión</h3>
+        <button onclick="closeAddExerciseModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="text" id="searchExInput" placeholder="Buscar o escribir nombre..." oninput="renderAddExList(this.value)" class="w-full border border-slate-200 rounded-lg px-3 py-2">
+      <div id="addExResults" class="max-h-60 overflow-y-auto divide-y divide-slate-100"></div>
+    </div>
+  </div>
+
+  <!-- Modal Base de Datos de Ejercicios (Catálogo) -->
+  <div id="catalogModal" class="modal-backdrop hidden">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 shadow-xl max-h-[85vh] flex flex-col text-xs">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2 shrink-0">
+        <h3 class="text-sm font-bold">Base de Datos de Ejercicios</h3>
+        <button onclick="closeCatalogModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Formulario añadir nuevo ejercicio -->
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 shrink-0">
+        <div class="grid grid-cols-3 gap-2">
+          <input type="text" id="catName" placeholder="Nombre ejercicio" class="col-span-2 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">
+          <select id="catGroup" class="bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+            <option>Pecho</option><option>Espalda</option><option>Pierna</option>
+            <option>Hombro</option><option>Bíceps</option><option>Tríceps</option><option>Core</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-between gap-2">
+          <label class="flex items-center gap-1.5 text-[11px] font-medium text-slate-600 cursor-pointer">
+            <input type="checkbox" id="catSync" checked class="rounded"> Mismo peso en CEN y POL
+          </label>
+          <button onclick="addCatalogExercise()" class="bg-slate-900 text-white font-bold px-3 py-1.5 rounded-lg">+ Guardar en BD</button>
+        </div>
+      </div>
+
+      <input type="text" id="filterCatalogInput" placeholder="Filtrar ejercicios..." oninput="renderCatalogList(this.value)" class="border border-slate-200 rounded-lg px-3 py-1.5 shrink-0">
+      <div id="catalogListContainer" class="flex-1 overflow-y-auto divide-y divide-slate-100"></div>
+    </div>
+  </div>
+
+  <!-- Modal Historial -->
+  <div id="historyModal" class="modal-backdrop hidden">
+    <div class="bg-white rounded-2xl p-5 w-full max-w-md space-y-3 shadow-xl max-h-[85vh] flex flex-col text-xs">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-2 shrink-0">
+        <h3 class="text-sm font-bold">Historial de Sesiones</h3>
+        <button onclick="closeHistoryModal()" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="historyListContainer" class="flex-1 overflow-y-auto space-y-2"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, setDoc, collection, addDoc, deleteDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBxDsbym6-ONm-mW7Ldx3pXxmF_ZJbms5M",
+      authDomain: "gym-tracker-b1669.firebaseapp.com",
+      projectId: "gym-tracker-b1669",
+      storageBucket: "gym-tracker-b1669.firebasestorage.app",
+      messagingSenderId: "213811562088",
+      appId: "1:213811562088:web:eb0171e3d581295a125ddd",
+      measurementId: "G-2Q9Z54425P"
+    };
+
+    const appId = "fit-tracker-app";
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+
+    let currentUser = null;
+    let activeGym = localStorage.getItem('fit_active_gym') || 'CEN';
+    let workoutSessions = [];
+    let allowedCatalog = JSON.parse(localStorage.getItem('fit_allowed_catalog')) || [];
+    let workoutLogs = [];
+    let activeSessionIndex = 0;
+    let unsubState = null, unsubLogs = null;
+
+    // --- Utilidades ---
+    const esc = s => String(s || '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const todayStr = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.add('hidden'), 2500);
+    }
+
+    function getActiveSession() {
+      if (!workoutSessions.length) return null;
+      if (activeSessionIndex >= workoutSessions.length) activeSessionIndex = 0;
+      return workoutSessions[activeSessionIndex];
+    }
+
+    function getExWeight(ex, gym = activeGym) {
+      if (ex.weights && ex.weights[gym] !== undefined) return Number(ex.weights[gym]) || 0;
+      return Number(ex.weight) || 0;
+    }
+
+    // Busca la última vez que hiciste este ejercicio en el historial
+    function getLastLogInfo(exName) {
+      const target = norm(exName);
+      for (const log of workoutLogs) {
+        if (log.isExtraActivity || !Array.isArray(log.exercisesDetail)) continue;
+        const found = log.exercisesDetail.find(d => norm(d.name) === target && d.status !== 'skipped');
+        if (found) {
+          const w = found.weight ?? 0;
+          const s = found.sets ?? 3;
+          const r = found.reps ?? 10;
+          const fecha = log.localDate ? log.localDate.slice(5).replace('-', '/') : '';
+          return `${w} kg · ${s}×${r}${fecha ? ` (${fecha})` : ''}`;
+        }
+      }
+      return null;
+    }
+
+    // --- Sede (CEN / POL) ---
+    function setGymLocation(loc) {
+      activeGym = loc;
+      localStorage.setItem('fit_active_gym', loc);
+      document.getElementById('btnGymCen').className = loc === 'CEN' ? 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm' : 'px-2.5 py-1 rounded-md text-slate-500';
+      document.getElementById('btnGymPol').className = loc === 'POL' ? 'px-2.5 py-1 rounded-md bg-white text-slate-900 shadow-sm' : 'px-2.5 py-1 rounded-md text-slate-500';
+      renderAll();
+    }
+
+    // --- Render principal ---
+    function renderAll() {
+      renderTabs();
+      renderSession();
+    }
+
+    function renderTabs() {
+      const box = document.getElementById('sessionTabs');
+      box.innerHTML = '';
+      workoutSessions.forEach((s, i) => {
+        const btn = document.createElement('button');
+        btn.className = `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+          i === activeSessionIndex ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+        }`;
+        btn.textContent = s.name;
+        btn.onclick = () => { activeSessionIndex = i; renderAll(); };
+        box.appendChild(btn);
+      });
+    }
+
+    function renderSession() {
+      const session = getActiveSession();
+      const list = document.getElementById('exerciseList');
+      if (!session) {
+        document.getElementById('activeSessionTitle').textContent = 'Sin sesiones';
+        list.innerHTML = '<div class="bg-white border border-slate-200 rounded-xl p-6 text-center text-xs text-slate-400">Crea una sesión arriba para empezar.</div>';
+        return;
+      }
+
+      document.getElementById('activeSessionTitle').textContent = `${session.name} (${activeGym})`;
+      document.getElementById('lastCompletedText').textContent = session.lastCompleted
+        ? `Última vez: ${new Date(session.lastCompleted).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}`
+        : 'Sin registrar aún';
+
+      const exs = session.exercises || [];
+      if (!exs.length) {
+        list.innerHTML = '<div class="bg-white border border-slate-200 rounded-xl p-6 text-center text-xs text-slate-400">Pulsa "+ Ejercicio" para añadir ejercicios a esta rutina.</div>';
+        return;
+      }
+
+      list.innerHTML = '';
+      exs.forEach((ex, idx) => {
+        const w = getExWeight(ex);
+        const lastInfo = getLastLogInfo(ex.name);
+        const isDone = ex.status === 'completed';
+
+        const card = document.createElement('div');
+        card.className = `bg-white border rounded-xl p-3 space-y-2.5 transition ${isDone ? 'border-emerald-400 bg-emerald-50/20' : 'border-slate-200'}`;
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <button onclick="toggleDone(${idx})" class="w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 text-transparent'}">
+                <i class="fa-solid fa-check text-[11px]"></i>
+              </button>
+              <div class="min-w-0">
+                <div class="font-bold text-slate-900 text-xs truncate">${esc(ex.name)}</div>
+                <div class="text-[11px] text-slate-400">
+                  ${lastInfo ? `Última: <span class="text-slate-600 font-medium">${esc(lastInfo)}</span>` : 'Sin registro previo'}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0 text-slate-400">
+              <button onclick="moveExercise(${idx}, -1)" class="p-1 hover:text-slate-700" title="Subir"><i class="fa-solid fa-arrow-up text-[10px]"></i></button>
+              <button onclick="moveExercise(${idx}, 1)" class="p-1 hover:text-slate-700" title="Bajar"><i class="fa-solid fa-arrow-down text-[10px]"></i></button>
+              <button onclick="removeExercise(${idx})" class="p-1 hover:text-rose-600" title="Quitar"><i class="fa-solid fa-trash-can text-[11px]"></i></button>
+            </div>
+          </div>
+
+          <!-- Inputs directos de Series, Reps y Peso -->
+          <div class="grid grid-cols-3 gap-2 pt-0.5">
+            <label class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 flex flex-col">
+              <span class="text-[9px] font-bold text-slate-400 uppercase">Series</span>
+              <input type="number" inputmode="numeric" min="1" value="${ex.sets || 3}"
+                onchange="updateExField(${idx}, 'sets', this.value)"
+                class="bg-transparent font-bold text-sm text-slate-900 focus:outline-none w-full">
+            </label>
+            <label class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 flex flex-col">
+              <span class="text-[9px] font-bold text-slate-400 uppercase">Reps</span>
+              <input type="number" inputmode="numeric" min="1" value="${ex.reps || 10}"
+                onchange="updateExField(${idx}, 'reps', this.value)"
+                class="bg-transparent font-bold text-sm text-slate-900 focus:outline-none w-full">
+            </label>
+            <label class="bg-indigo-50/60 border border-indigo-200 rounded-lg px-2 py-1 flex flex-col">
+              <span class="text-[9px] font-bold text-indigo-600 uppercase">Peso (kg)</span>
+              <input type="number" inputmode="decimal" step="0.5" min="0" value="${w}"
+                onchange="updateExField(${idx}, 'weight', this.value)"
+                class="bg-transparent font-bold text-sm text-indigo-950 focus:outline-none w-full">
+            </label>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    // --- Edición directa en el cuaderno ---
+    function updateExField(idx, field, rawVal) {
+      const session = getActiveSession();
+      const ex = session?.exercises?.[idx];
+      if (!ex) return;
+
+      if (field === 'sets' || field === 'reps') {
+        ex[field] = Math.max(1, parseInt(rawVal) || 1);
+      } else if (field === 'weight') {
+        const val = Math.max(0, parseFloat(rawVal) || 0);
+        if (!ex.weights) ex.weights = { CEN: val, POL: val };
+        if (ex.syncWeights) {
+          ex.weights = { CEN: val, POL: val };
+        } else {
+          ex.weights[activeGym] = val;
+        }
+        // También actualizamos el peso por defecto en el catálogo si existe
+        const cat = allowedCatalog.find(c => norm(c.name) === norm(ex.name));
+        if (cat) {
+          if (!cat.weights) cat.weights = { CEN: val, POL: val };
+          if (cat.syncWeights) cat.weights = { CEN: val, POL: val };
+          else cat.weights[activeGym] = val;
+          localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+        }
+      }
+      saveMainState(false);
+    }
+
+    function toggleDone(idx) {
+      const ex = getActiveSession()?.exercises?.[idx];
+      if (!ex) return;
+      ex.status = ex.status === 'completed' ? 'pending' : 'completed';
+      saveMainState(true);
+    }
+
+    function moveExercise(idx, dir) {
+      const exs = getActiveSession()?.exercises;
+      if (!exs) return;
+      const target = idx + dir;
+      if (target < 0 || target >= exs.length) return;
+      [exs[idx], exs[target]] = [exs[target], exs[idx]];
+      saveMainState(true);
+    }
+
+    function removeExercise(idx) {
+      const session = getActiveSession();
+      if (!session) return;
+      session.exercises.splice(idx, 1);
+      saveMainState(true);
+    }
+
+    // --- Guardar entrenamiento en workoutLogs ---
+    function saveWorkoutSession() {
+      if (!currentUser) return;
+      const session = getActiveSession();
+      if (!session || !session.exercises?.length) return;
+
+      // Si no marcaste ninguno con el check verde, asumimos que hiciste todos los de la sesión
+      const anyChecked = session.exercises.some(e => e.status === 'completed');
+      const now = new Date();
+      let totalVol = 0;
+
+      const details = session.exercises.map(e => {
+        const done = anyChecked ? e.status === 'completed' : true;
+        const w = getExWeight(e);
+        const sets = parseInt(e.sets) || 3;
+        const reps = parseInt(e.reps) || 10;
+        if (done) totalVol += sets * reps * w;
+        return {
+          id: e.id || null,
+          name: e.name,
+          group: e.group || 'General',
+          sets, reps, weight: w,
+          status: done ? 'completed' : 'skipped'
+        };
+      });
+
+      const logDoc = {
+        sessionName: session.name,
+        localDate: todayStr(now),
+        createdAt: now.toISOString(),
+        location: activeGym,
+        exercisesCount: details.length,
+        completedCount: details.filter(d => d.status === 'completed').length,
+        volume: totalVol,
+        exercisesDetail: details
+      };
+
+      addDoc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs'), logDoc)
+        .catch(err => toast("Error al guardar: " + err.message));
+
+      session.lastCompleted = now.toISOString();
+      session.exercises.forEach(e => { e.status = 'pending'; });
+      saveMainState(true);
+      toast("Sesión guardada en el historial");
+    }
+
+    // --- Sesiones ---
+    function openNewSessionModal() {
+      document.getElementById('newSessionNameInput').value = '';
+      document.getElementById('newSessionModal').classList.remove('hidden');
+    }
+    function closeNewSessionModal() { document.getElementById('newSessionModal').classList.add('hidden'); }
+
+    function createNewSession() {
+      const name = document.getElementById('newSessionNameInput').value.trim();
+      if (!name) return;
+      workoutSessions.push({ id: 'sess_' + Date.now(), name, lastCompleted: null, exercises: [] });
+      activeSessionIndex = workoutSessions.length - 1;
+      closeNewSessionModal();
+      saveMainState(true);
+    }
+
+    function deleteCurrentSession() {
+      if (workoutSessions.length <= 1) { toast("Debe quedar al menos una sesión"); return; }
+      if (!confirm(`¿Borrar "${getActiveSession().name}"?`)) return;
+      workoutSessions.splice(activeSessionIndex, 1);
+      activeSessionIndex = 0;
+      saveMainState(true);
+    }
+
+    // --- Añadir ejercicio desde el catálogo ---
+    function openAddExerciseModal() {
+      document.getElementById('searchExInput').value = '';
+      renderAddExList('');
+      document.getElementById('addExModal').classList.remove('hidden');
+    }
+    function closeAddExerciseModal() { document.getElementById('addExModal').classList.add('hidden'); }
+
+    function renderAddExList(q) {
+      const box = document.getElementById('addExResults');
+      const term = norm(q);
+      const matches = allowedCatalog.filter(c => !term || norm(c.name).includes(term) || norm(c.group).includes(term));
+      box.innerHTML = '';
+
+      matches.forEach(c => {
+        const w = c.weights?.[activeGym] ?? 0;
+        const row = document.createElement('button');
+        row.className = 'w-full text-left py-2.5 px-1 hover:bg-slate-50 flex justify-between items-center';
+        row.innerHTML = `
+          <div>
+            <div class="font-bold text-slate-800">${esc(c.name)}</div>
+            <div class="text-[10px] text-slate-400">${esc(c.group)}</div>
+          </div>
+          <span class="text-[11px] font-bold text-indigo-600">${w} kg</span>
+        `;
+        row.onclick = () => addExerciseToSession(c);
+        box.appendChild(row);
+      });
+
+      // Opción rápida para crear ejercicio al vuelo si no está en la BD
+      if (q.trim() && !matches.some(m => norm(m.name) === term)) {
+        const createBtn = document.createElement('button');
+        createBtn.className = 'w-full text-left py-2.5 px-1 text-indigo-600 font-bold';
+        createBtn.textContent = `+ Crear "${q.trim()}" y añadir`;
+        createBtn.onclick = () => {
+          const newCat = {
+            id: 'cat_' + Date.now(), name: q.trim(), group: 'General',
+            defaultSets: 3, defaultReps: 10, weights: { CEN: 0, POL: 0 }, syncWeights: true, inCen: true, inPol: true
+          };
+          allowedCatalog.push(newCat);
+          localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+          addExerciseToSession(newCat);
+        };
+        box.appendChild(createBtn);
+      }
+    }
+
+    function addExerciseToSession(cat) {
+      const session = getActiveSession();
+      if (!session) return;
+      session.exercises.push({
+        id: 'ex_' + Date.now(),
+        catalogId: cat.id,
+        name: cat.name,
+        group: cat.group || 'General',
+        sets: cat.defaultSets || 3,
+        reps: cat.defaultReps || 10,
+        weights: { CEN: cat.weights?.CEN ?? 0, POL: cat.weights?.POL ?? 0 },
+        syncWeights: cat.syncWeights ?? true,
+        status: 'pending'
+      });
+      closeAddExerciseModal();
+      saveMainState(true);
+    }
+
+    // --- Base de datos de ejercicios (Catálogo) ---
+    function openCatalogModal() {
+      document.getElementById('filterCatalogInput').value = '';
+      renderCatalogList('');
+      document.getElementById('catalogModal').classList.remove('hidden');
+    }
+    function closeCatalogModal() { document.getElementById('catalogModal').classList.add('hidden'); }
+
+    function renderCatalogList(q) {
+      const box = document.getElementById('catalogListContainer');
+      const term = norm(q);
+      const list = allowedCatalog.filter(c => !term || norm(c.name).includes(term) || norm(c.group).includes(term));
+      box.innerHTML = list.length ? '' : '<p class="text-slate-400 py-4 text-center">No hay ejercicios.</p>';
+
+      list.forEach(c => {
+        const realIdx = allowedCatalog.indexOf(c);
+        const row = document.createElement('div');
+        row.className = 'py-2 flex items-center justify-between gap-2';
+        row.innerHTML = `
+          <div class="min-w-0">
+            <div class="font-bold text-slate-800 truncate">${esc(c.name)}</div>
+            <div class="text-[10px] text-slate-400">${esc(c.group)} · CEN: ${c.weights?.CEN ?? 0}kg / POL: ${c.weights?.POL ?? 0}kg</div>
+          </div>
+          <button onclick="deleteCatalogExercise(${realIdx})" class="text-slate-400 hover:text-rose-600 p-1"><i class="fa-solid fa-trash-can"></i></button>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function addCatalogExercise() {
+      const name = document.getElementById('catName').value.trim();
+      if (!name) return;
+      const group = document.getElementById('catGroup').value;
+      const syncWeights = document.getElementById('catSync').checked;
+      allowedCatalog.push({
+        id: 'cat_' + Date.now(), name, group,
+        defaultSets: 3, defaultReps: 10,
+        weights: { CEN: 0, POL: 0 }, syncWeights, inCen: true, inPol: true
+      });
+      document.getElementById('catName').value = '';
+      localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+      saveMainState(false);
+      renderCatalogList('');
+      toast("Ejercicio añadido a la base de datos");
+    }
+
+    function deleteCatalogExercise(idx) {
+      allowedCatalog.splice(idx, 1);
+      localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+      saveMainState(false);
+      renderCatalogList(document.getElementById('filterCatalogInput').value);
+    }
+
+    // --- Historial simple ---
+    function openHistoryModal() {
+      const box = document.getElementById('historyListContainer');
+      const gymLogs = workoutLogs.filter(l => !l.isExtraActivity);
+      box.innerHTML = gymLogs.length ? '' : '<p class="text-slate-400 text-center py-6">Aún no hay sesiones guardadas.</p>';
+
+      gymLogs.forEach(log => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5';
+        const exLines = (log.exercisesDetail || [])
+          .filter(d => d.status !== 'skipped')
+          .map(d => `<div class="flex justify-between text-[11px] text-slate-600"><span>${esc(d.name)}</span><span class="font-semibold">${d.sets}×${d.reps} · ${d.weight}kg</span></div>`)
+          .join('');
+
+        card.innerHTML = `
+          <div class="flex justify-between items-center">
+            <div>
+              <span class="font-bold text-slate-900">${esc(log.sessionName)}</span>
+              <span class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded font-bold ml-1">${esc(log.location || 'CEN')}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-slate-500">${esc(log.localDate || '')}</span>
+              <button onclick="deleteLog('${log.id}')" class="text-slate-400 hover:text-rose-600"><i class="fa-solid fa-trash-can text-[11px]"></i></button>
+            </div>
+          </div>
+          <div class="pt-1 border-t border-slate-200/70 space-y-0.5">${exLines}</div>
+        `;
+        box.appendChild(card);
+      });
+      document.getElementById('historyModal').classList.remove('hidden');
+    }
+    function closeHistoryModal() { document.getElementById('historyModal').classList.add('hidden'); }
+
+    function deleteLog(id) {
+      if (!currentUser || !confirm("¿Borrar este registro del historial?")) return;
+      deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'workoutLogs', id));
+    }
+
+    // --- Sincronización Firestore ---
+    function saveMainState(rerender = true) {
+      if (currentUser) {
+        setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'userWorkouts', 'mainState'), {
+          sessions: workoutSessions,
+          allowedCatalog: allowedCatalog,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(err => console.error(err));
+      }
+      if (rerender) renderAll();
+    }
+
+    function toggleLoginModal() { document.getElementById('loginModal').classList.toggle('hidden'); }
+
+    async function performLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const pass = document.getElementById('loginPassword').value;
+      const errBox = document.getElementById('authErrorMessage');
+      errBox.classList.add('hidden');
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+        document.getElementById('loginPassword').value = '';
+        toggleLoginModal();
+      } catch (e) {
+        errBox.textContent = e.message;
+        errBox.classList.remove('hidden');
+      }
+    }
+
+    async function performLogout() {
+      await signOut(auth);
+      toggleLoginModal();
+    }
+
+    onAuthStateChanged(auth, user => {
+      currentUser = user;
+      document.getElementById('loggedInContent').classList.toggle('hidden', !user);
+      document.getElementById('loggedOutContent').classList.toggle('hidden', !!user);
+      document.getElementById('unauthenticatedCard').classList.toggle('hidden', !!user);
+      document.getElementById('authenticatedApp').classList.toggle('hidden', !user);
+      document.getElementById('userHeaderIcon').className = user ? 'fa-solid fa-user-check text-emerald-600' : 'fa-solid fa-user';
+      if (user) document.getElementById('userEmailDisplay').textContent = user.email;
+
+      if (unsubState) unsubState();
+      if (unsubLogs) unsubLogs();
+
+      if (user) {
+        unsubState = onSnapshot(doc(db, 'artifacts', appId, 'users', user.uid, 'userWorkouts', 'mainState'), snap => {
+          if (snap.exists()) {
+            const data = snap.data();
+            if (Array.isArray(data.sessions)) workoutSessions = data.sessions;
+            if (Array.isArray(data.allowedCatalog)) {
+              allowedCatalog = data.allowedCatalog;
+              localStorage.setItem('fit_allowed_catalog', JSON.stringify(allowedCatalog));
+            }
+            renderAll();
+          }
+        });
+
+        const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workoutLogs'), orderBy('createdAt', 'desc'), limit(100));
+        unsubLogs = onSnapshot(q, snap => {
+          workoutLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          renderSession();
+          if (!document.getElementById('historyModal').classList.contains('hidden')) openHistoryModal();
+        });
+      }
+    });
+
+    Object.assign(window, {
+      setGymLocation, toggleLoginModal, performLogin, performLogout,
+      openNewSessionModal, closeNewSessionModal, createNewSession, deleteCurrentSession,
+      openAddExerciseModal, closeAddExerciseModal, renderAddExList,
+      openCatalogModal, closeCatalogModal, renderCatalogList, addCatalogExercise, deleteCatalogExercise,
+      openHistoryModal, closeHistoryModal, deleteLog,
+      updateExField, toggleDone, moveExercise, removeExercise, saveWorkoutSession
+    });
+
+    setGymLocation(activeGym);
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  </script>
+</body>
+</html>
